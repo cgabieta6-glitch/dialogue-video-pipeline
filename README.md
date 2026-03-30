@@ -1,5 +1,7 @@
 # Dialogue Video Pipeline
 
+> ⚠️ **Early Development Stage** — This project is still in its early stages. I'm a college student and will be updating this whenever I'm not busy with schoolwork. Contributions, suggestions, and feedback are welcome!
+
 An automated pipeline that transforms **NotebookLM Audio Overview** `.m4a` files into polished, landscape-oriented dialogue videos with synchronized scene images — powered by FFmpeg and parallel processing.
 
 ## How It Works
@@ -14,8 +16,20 @@ An automated pipeline that transforms **NotebookLM Audio Overview** `.m4a` files
 |---|--------|-------------|
 | 1 | `auto_segment.py` | Converts raw `.txt` transcripts into structured `.json` dialogue files with speaker IDs, paragraphs, and image search terms |
 | 2 | `cut_audio.py` | Uses FFmpeg to slice the full `.m4a` audio into individual speaker segments based on timestamps |
-| 3 | `search_provider.py` | Downloads relevant images for each dialogue segment using the `image_search` field in the JSON |
+| 3 | `search_provider.py` | Downloads relevant images using a **3-tier fallback system** (see below) |
 | 4 | `make_video.py` | Renders all segments into 1280×720 landscape videos in parallel, stitches them into a final `.mp4`, exports to Google Drive, and auto-cleans all intermediate files |
+
+### Image Search: 3-Tier Fallback System (`search_provider.py`)
+
+The image downloader uses a triple-tier search strategy to maximize the chances of finding a relevant image for every dialogue segment:
+
+| Tier | Provider | Description |
+|------|----------|-------------|
+| 🥇 Tier 1 | **Degoog** (local) | Primary search engine. Appends `"meme funny"` to queries for more engaging, visual results. Runs locally via `http://127.0.0.1:8082`. |
+| 🥈 Tier 2 | **Wikimedia Commons** | Falls back to Wikimedia's free image library if Degoog fails or returns no results. Great for educational/scientific diagrams. |
+| 🥉 Tier 3 | **SearXNG** (local) | Last resort fallback. Queries the local SearXNG meta-search engine at `http://localhost:8080` for broader web image results. |
+
+If one tier fails or returns no usable images, the system automatically tries the next tier before moving on.
 
 ## File Naming Convention
 
@@ -103,3 +117,16 @@ The pipeline requires FFmpeg to handle all video and audio processing.
 
 ### 3. Image Search
 - Local image search services (Degoog/SearXNG) are required for `search_provider.py`.
+
+## Roadmap / Planned Updates
+
+This project is actively being developed. Here are the features I'm planning to add:
+
+- [ ] **Improved Pacing & Dynamic Scene Changes** — Currently, if a character speaks a long paragraph (e.g., 20+ seconds), the video stays on a single image, which can feel slow and less dynamic. The fix: generate a new image (with a new `image_search` query) for every *sentence* instead of every paragraph, so the visuals change more frequently and keep viewers engaged.
+- [ ] **Custom Voice Options** — Add support for custom TTS voices (e.g., Coqui XTTSv2, ElevenLabs) so users can replace the default NotebookLM speakers with their own character voices.
+- [ ] **PDF / PPTX Image Extraction** — Allow `search_provider.py` to search for and extract relevant images directly from PDF or PowerPoint files provided as input, instead of (or in addition to) downloading from the web. Perfect for educational content where the source material already contains the best diagrams.
+- [ ] **Batch Processing UI** — A simple web interface or CLI menu for drag-and-drop batch processing of multiple audio files.
+- [ ] **Smart Image Caching** — Cache previously downloaded images to avoid redundant searches across similar topics.
+- [ ] **Subtitle / Caption Overlay** — Burn speaker subtitles directly into the video for accessibility.
+
+> 💡 *If you have ideas or want to contribute, feel free to open an issue or pull request!*
