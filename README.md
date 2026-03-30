@@ -128,5 +128,7 @@ This project is actively being developed. Here are the features I'm planning to 
 - [ ] **Batch Processing UI** — A simple web interface or CLI menu for drag-and-drop batch processing of multiple audio files.
 - [ ] **Smart Image Caching** — Cache previously downloaded images to avoid redundant searches across similar topics.
 - [ ] **Subtitle / Caption Overlay** — Burn speaker subtitles directly into the video for accessibility.
+- [ ] **One-Click Automator** — A single script that takes just a raw NotebookLM Audio Overview `.m4a` file as input and automatically runs the entire pipeline end-to-end (transcribe → segment → search images → render video) with zero manual steps. Just drop in your `.m4a` and get a finished video out.
+- [ ] **Remotion / Revideo Integration** — Migrate the video rendering engine from raw FFmpeg commands to [Remotion](https://remotion.dev/) or [Revideo](https://re.video/) for more powerful, React-based video composition. This would unlock features like animated text overlays, smooth transitions between scenes, dynamic layouts, and much more polished visual output.
 
 > 💡 *If you have ideas or want to contribute, feel free to open an issue or pull request!*
