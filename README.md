@@ -114,6 +114,14 @@ python search_provider.py --tiers 2
 python search_provider.py --tiers 3,1
 ```
 
+### 🖼️ Disabling "Meme" Suffix
+By default, the script appends `"meme funny"` to all Degoog searches to get more expressive results. If you want cleaner, more professional images, you can disable this:
+
+```bash
+# Disable the 'meme funny' suffix
+python search_provider.py --no-meme
+```
+
 ## File Naming Convention
 
 The pipeline uses a **`done` prefix** to track which files have been processed:

@@ -40,13 +40,14 @@ class TripleTierProvider(ImageSearchProvider):
     """
 
 
-    def __init__(self, tier_order=None):
+    def __init__(self, tier_order=None, include_meme=True):
         self.download_dir = "downloaded_images"
         os.makedirs(self.download_dir, exist_ok=True)
         self.searxng_base = os.getenv("SEARXNG_BASE_URL", "http://localhost:8080")
         
         # Default order if none provided: 1 (Degoog), 2 (Wikimedia), 3 (SearXNG)
         self.tier_order = tier_order or [1, 2, 3]
+        self.include_meme = include_meme
         
         # User Agents for rotating to avoid 403s on SearXNG
         self.user_agents = [
@@ -161,7 +162,10 @@ class TripleTierProvider(ImageSearchProvider):
     def _search_degoog(self, term: str, **kwargs) -> Optional[str]:
         """Tier 3: Degoog Image Search API (Self-hosted)"""
         dialogue_id = kwargs.get("dialogue_id")
-        search_term = f"{term} meme funny" # Automatically append explicit internet culture tags
+        
+        # Add 'meme funny' suffix if enabled
+        search_term = f"{term} meme funny" if self.include_meme else term
+        
         try:
             print(f"[Degoog] Trying search for '{search_term}'...")
             degoog_base = os.getenv("DEGOOG_BASE_URL", "http://127.0.0.1:8082")
@@ -241,8 +245,8 @@ class TripleTierProvider(ImageSearchProvider):
 SearXNGProvider = TripleTierProvider
 
 
-def process_json_files(tier_order=None):
-    provider = TripleTierProvider(tier_order=tier_order)
+def process_json_files(tier_order=None, include_meme=True):
+    provider = TripleTierProvider(tier_order=tier_order, include_meme=include_meme)
     
     # We will look for all JSON files that start with "done "
     for filename in os.listdir('.'):
@@ -289,6 +293,11 @@ if __name__ == "__main__":
         default="1,2,3", 
         help="Comma-separated tier order (e.g., '1,2,3' for Degoog->Wiki->SearXNG)"
     )
+    parser.add_argument(
+        "--no-meme", 
+        action="store_true", 
+        help="Disable adding 'meme funny' suffix to Degoog searches"
+    )
     args = parser.parse_args()
     
     # Parse the tier string into a list of integers
@@ -303,4 +312,4 @@ if __name__ == "__main__":
         print(f"Error parsing tiers: {e}. Defaulting to 1,2,3.")
         final_tiers = [1, 2, 3]
 
-    process_json_files(tier_order=final_tiers)
+    process_json_files(tier_order=final_tiers, include_meme=not args.no_meme)
