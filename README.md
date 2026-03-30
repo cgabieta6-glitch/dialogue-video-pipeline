@@ -19,6 +19,41 @@ An automated pipeline that transforms **NotebookLM Audio Overview** `.m4a` files
 | 3 | `search_provider.py` | Downloads relevant images using a **3-tier fallback system** (see below) |
 | 4 | `make_video.py` | Renders all segments into 1280×720 landscape videos in parallel, stitches them into a final `.mp4`, exports to Google Drive, and auto-cleans all intermediate files |
 
+## 📖 Manual Execution Master Guide
+
+If you record a new audio file (e.g., `stats_2a.m4a`) and generate a transcript (`stats_2a.m4a.txt`), follow this exact flow to process it:
+
+### Step 1: `auto_segment.py`
+**What it does:** Converts raw transcript text files into structured `.json` dialogue files.
+```powershell
+python auto_segment.py
+```
+
+### Step 2: `cut_audio.py`
+**What it does:** Slices your single audio file into hundreds of tiny speaker-specific `.mp3` clips.
+```powershell
+python cut_audio.py
+```
+*(Creates a folder called `stats 2a/` for the segments).*
+
+### Step 3: `search_provider.py`
+**What it does:** Downloads relevant images for every sentence and updates the `.json`.
+```powershell
+# Optional: use --tiers to customize search providers
+python search_provider.py --tiers 1,2,3
+```
+*(Images are saved in `done stats 2a.m4a_images/`).*
+
+### Step 4: `make_video.py`
+**What it does:** The final step. Renders and stitches everything into an `.mp4`.
+```powershell
+python make_video.py
+```
+*(On Google Colab, this runs in parallel for maximum speed).*
+
+### Step 5: `cleanup.py` (Optional)
+**What it does:** This is now mostly **automated**! `make_video.py` will automatically shred the leftover assets (JSON, audio folders, etc.) once the video is finished. You only need to run `cleanup.py` if you want to manually wipe files that were interrupted.
+
 ### Image Search: 3-Tier Fallback System (`search_provider.py`)
 
 The image downloader uses a triple-tier search strategy to maximize the chances of finding a relevant image for every dialogue segment:
