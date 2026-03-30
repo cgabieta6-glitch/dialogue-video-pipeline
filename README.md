@@ -75,6 +75,15 @@ This will start both search providers in the background.
 
 Once started, `search_provider.py` will automatically detect and use these services to download your images.
 
+### 💡 Pro Tip: Using AI for Better Image Search Terms
+For the best visual storytelling, your `image_search` terms should be **descriptive, specific, and unique**. Instead of just "data", use "Data Visualization Abstract Glowing Grid".
+
+You can use ChatGPT, Gemini, or Claude to generate these terms for your JSON. Here is a prompt you can use:
+
+> "I am building a dialogue video. Here is a list of dialogue paragraphs. For each paragraph, generate a 3-5 word 'image_search' query that is visually striking and represents the core concept. Output it in a JSON format where each entry has an 'id', 'character', 'paragraph', and 'image_search' field."
+
+**Reference:** Check out [**done stats 2a.m4a.json**](./done%20stats%202a.m4a.json) in this repository to see an example of how professional AI-generated search terms look and how they map to the dialogue.
+
 ### ⚠️ Troubleshooting Port Conflicts
 If you encounter a "Port is already in use" error:
 1. Open Task Manager and stop any applications using those ports.
