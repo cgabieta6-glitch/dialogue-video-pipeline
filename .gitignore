@@ -1,0 +1,16 @@
+# Python / Video Rendering ignores
+__pycache__/
+*.pyc
+
+# Heavy local binaries
+ffmpeg/
+
+# Intermediate and Final Media
+temp_segments/
+output_videos/
+downloaded_images/
+*.m4a
+*.mp3
+*.txt
+*.json
+*_images/
