@@ -8,7 +8,7 @@ An automated pipeline that transforms **NotebookLM Audio Overview** `.m4a` files
 
 ### Source Material
 1. **Generate audio** using [Google NotebookLM](https://notebooklm.google.com/) Audio Overview feature — this produces a `.m4a` dialogue file between two AI speakers.
-2. **Transcribe the audio** using the included **[Chatterbox Turbo for Transcribing NotebookLM Audio Overview.ipynb](https://colab.research.google.com/)** Colab notebook — this generates a timestamped `.txt` transcript with speaker labels.
+2. **Transcribe the audio** using the included **[WhisperX for Transcribing NotebookLM Audio Overview.ipynb](https://colab.research.google.com/)** Colab notebook — this generates a timestamped `.txt` transcript with speaker labels.
 
 ### Pipeline Scripts (Run in Order)
 
