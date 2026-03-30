@@ -78,11 +78,10 @@ Once started, `search_provider.py` will automatically detect and use these servi
 ### 💡 Pro Tip: Using AI for Better Image Search Terms
 For the best visual storytelling, your `image_search` terms should be **descriptive, specific, and unique**. Instead of just "data", use "Data Visualization Abstract Glowing Grid".
 
-You can use ChatGPT, Gemini, or Claude to generate these terms for your JSON. Here is a prompt you can use:
+You can use ChatGPT, Gemini, or Claude to **"Level Up"** these terms. While `auto_segment.py` provides a great baseline (as seen in [**done stats 2a.m4a.json**](./done%20stats%202a.m4a.json)), using a dedicated LLM can generate much more creative and visually impactful terms.
 
-> "I am building a dialogue video. Here is a list of dialogue paragraphs. For each paragraph, generate a 3-5 word 'image_search' query that is visually striking and represents the core concept. Output it in a JSON format where each entry has an 'id', 'character', 'paragraph', and 'image_search' field."
-
-**Reference:** Check out [**done stats 2a.m4a.json**](./done%20stats%202a.m4a.json) in this repository to see an example of how professional AI-generated search terms look and how they map to the dialogue.
+**Example "Polishing" Prompt:**
+> "I have a JSON file with dialogue and basic image search terms. For each entry, please rewrite the 'image_search' field to be more cinematic and professional (e.g., instead of 'data chart', use 'Holographic 3D Data Visualization'). Keep the other fields the same."
 
 ### ⚠️ Troubleshooting Port Conflicts
 If you encounter a "Port is already in use" error:
