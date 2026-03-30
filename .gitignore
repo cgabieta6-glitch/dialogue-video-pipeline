@@ -19,7 +19,9 @@ downloaded_images/
 !done stats 2a.m4a
 !done stats 2a.m4a.json
 !stats 2a/
+!stats 2a/**
 !done stats 2a.m4a_images/
+!done stats 2a.m4a_images/**
 !output_videos/
 !output_videos/stats 2a.mp4
 !*.ipynb

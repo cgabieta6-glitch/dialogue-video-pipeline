@@ -90,9 +90,16 @@ for root, dirs, files in os.walk(extract_path):
         break
 ```
 
-## Requirements
+## Setup & Requirements
 
+### 1. Install FFmpeg
+The pipeline requires FFmpeg to handle all video and audio processing.
+- **Windows:** [Download FFmpeg (Builds by gyan.dev)](https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z). Extract it and ensure the `ffmpeg/bin` folder is in your project root or your system PATH.
+- **Google Colab:** Pre-installed (the script handles the setup automatically).
+
+### 2. Python Dependencies
 - **Python 3.10+**
-- **FFmpeg** (included locally for Windows, pre-installed on Colab)
 - **tqdm** (`pip install tqdm` — auto-installed by the script if missing)
-- Local image search services (Degoog/SearXNG) for `search_provider.py`
+
+### 3. Image Search
+- Local image search services (Degoog/SearXNG) are required for `search_provider.py`.
