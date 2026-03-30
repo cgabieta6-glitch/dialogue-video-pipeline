@@ -31,6 +31,20 @@ The image downloader uses a triple-tier search strategy to maximize the chances 
 
 If one tier fails or returns no usable images, the system automatically tries the next tier before moving on.
 
+### ⚙️ Configuring Search Tiers (Tier Changer)
+You can manually choose which search providers to use and in what order by using the `--tiers` flag:
+
+```bash
+# Default: Try Degoog, then Wikimedia, then SearXNG
+python search_provider.py --tiers 1,2,3
+
+# Only use Wikimedia (Tier 2)
+python search_provider.py --tiers 2
+
+# Try SearXNG (Tier 3) first, then Degoog (Tier 1)
+python search_provider.py --tiers 3,1
+```
+
 ## File Naming Convention
 
 The pipeline uses a **`done` prefix** to track which files have been processed:

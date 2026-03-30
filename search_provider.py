@@ -9,6 +9,7 @@ import re
 import random
 import time
 import socket
+import argparse
 
 # Prevent any socket operation from hanging forever
 socket.setdefaulttimeout(10.0)
@@ -38,10 +39,14 @@ class TripleTierProvider(ImageSearchProvider):
     Tier 3: Improved SearXNG (Evasive scraper for safety)
     """
 
-    def __init__(self):
+
+    def __init__(self, tier_order=None):
         self.download_dir = "downloaded_images"
         os.makedirs(self.download_dir, exist_ok=True)
         self.searxng_base = os.getenv("SEARXNG_BASE_URL", "http://localhost:8080")
+        
+        # Default order if none provided: 1 (Degoog), 2 (Wikimedia), 3 (SearXNG)
+        self.tier_order = tier_order or [1, 2, 3]
         
         # User Agents for rotating to avoid 403s on SearXNG
         self.user_agents = [
@@ -189,6 +194,7 @@ class TripleTierProvider(ImageSearchProvider):
             print(f"[Degoog] Search failed: {e}")
         return None
 
+
     def search_image(self, term: str, dialogue_id: Optional[int] = None) -> Optional[str]:
         if not term: return None
         
@@ -210,32 +216,39 @@ class TripleTierProvider(ImageSearchProvider):
                     return existing
 
         params = {"dialogue_id": dialogue_id}
-        
-        # 2. Degoog Fallback (Tier 1) (Includes 'meme funny')
-        result = self._search_degoog(term, **params)
-        
-        # 3. Wikimedia Fallback (Tier 2)
-        if not result: result = self._search_wikimedia(term, **params)
+        result = None
 
-        # 4. SearXNG Fallback (Tier 3) (Improved evasion)
-        if not result: 
-            result = self._search_searxng_improved(term, dialogue_id=dialogue_id)
+        # 2. Iterate through configured tiers
+        for tier in self.tier_order:
+            if result: break
+
+            if tier == 1:
+                # Degoog Fallback (Includes 'meme funny')
+                result = self._search_degoog(term, **params)
+            elif tier == 2:
+                # Wikimedia Fallback
+                result = self._search_wikimedia(term, **params)
+            elif tier == 3:
+                # SearXNG Fallback (Improved evasion)
+                result = self._search_searxng_improved(term, dialogue_id=dialogue_id)
             
         if not result:
-            print(f"[Error] ALL image providers failed for '{term}'.")
+            print(f"[Error] ALL image providers ({self.tier_order}) failed for '{term}'.")
             
         return result
 
 # Expose classic name for old integrations
 SearXNGProvider = TripleTierProvider
 
-def process_json_files():
-    provider = TripleTierProvider()
+
+def process_json_files(tier_order=None):
+    provider = TripleTierProvider(tier_order=tier_order)
     
     # We will look for all JSON files that start with "done "
     for filename in os.listdir('.'):
         if filename.startswith('done ') and filename.endswith('.json'):
             print(f"\n--- Processing {filename} ---")
+            print(f"--- Using Tiers: {provider.tier_order} ---")
             
             # Create a dedicated download folder named to avoid conflicts with existing .m4a files
             folder_name = filename.replace('.json', '_images')  # e.g., "done chem_ch4_images"
@@ -269,4 +282,25 @@ def process_json_files():
                 print(f"No updates necessary for {filename}.")
 
 if __name__ == "__main__":
-    process_json_files()
+    parser = argparse.ArgumentParser(description="Triple-Tier Image Search Pipeline")
+    parser.add_argument(
+        "--tiers", 
+        type=str, 
+        default="1,2,3", 
+        help="Comma-separated tier order (e.g., '1,2,3' for Degoog->Wiki->SearXNG)"
+    )
+    args = parser.parse_args()
+    
+    # Parse the tier string into a list of integers
+    try:
+        requested_tiers = [int(t.strip()) for t in args.tiers.split(",")]
+        # Filter to only valid tiers 1, 2, 3
+        final_tiers = [t for t in requested_tiers if t in [1, 2, 3]]
+        if not final_tiers:
+            print("No valid tiers specified. Defaulting to 1,2,3.")
+            final_tiers = [1, 2, 3]
+    except Exception as e:
+        print(f"Error parsing tiers: {e}. Defaulting to 1,2,3.")
+        final_tiers = [1, 2, 3]
+
+    process_json_files(tier_order=final_tiers)
