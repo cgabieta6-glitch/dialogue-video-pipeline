@@ -54,6 +54,32 @@ python make_video.py
 ### Step 5: `cleanup.py` (Optional)
 **What it does:** This is now mostly **automated**! `make_video.py` will automatically shred the leftover assets (JSON, audio folders, etc.) once the video is finished. You only need to run `cleanup.py` if you want to manually wipe files that were interrupted.
 
+## 🐳 Local Search Provider Setup (Docker)
+
+To enable image downloading, you must run the local search providers (Degoog and SearXNG). The easiest way to do this is using **Docker Desktop**.
+
+### 1. Prerequisites
+- **Docker Desktop** installed and running on your machine.
+- **Port 8080** (SearXNG) and **Port 8082** (Degoog) must be available.
+
+### 2. Start Services
+Run the following command in your project root:
+```powershell
+docker-compose up -d
+```
+This will start both search providers in the background.
+
+### 3. Verify Connections
+- **SearXNG**: [http://localhost:8080](http://localhost:8080)
+- **Degoog**: [http://127.0.0.1:8082](http://127.0.0.1:8082)
+
+Once started, `search_provider.py` will automatically detect and use these services to download your images.
+
+### ⚠️ Troubleshooting Port Conflicts
+If you encounter a "Port is already in use" error:
+1. Open Task Manager and stop any applications using those ports.
+2. Or, modify the `docker-compose.yml` and `search_provider.py` to use different ports.
+
 ### Image Search: 3-Tier Fallback System (`search_provider.py`)
 
 The image downloader uses a triple-tier search strategy to maximize the chances of finding a relevant image for every dialogue segment:

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # SearXNG: Primary Local Search Provider (Port 8080)
+  searxng:
+    container_name: searxng
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080
+      - UWSGI_PROCESSES=2
+      - UWSGI_THREADS=4
+
+  # Degoog: Secondary Search Aggregator (Port 8082)
+  degoog:
+    container_name: degoog
+    image: s0md3v/degoog:latest
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - DEGOOG_PORT=8082
