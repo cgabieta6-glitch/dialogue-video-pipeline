@@ -57,8 +57,8 @@ def process_file(filename):
     current_id = 0
     used_queries = set()
 
-    # Regex to match [0.03s - 17.36s] [SPEAKER_00]:  paragraph....
-    pattern = re.compile(r'\[.*?\] \[(SPEAKER_\d+)\]:\s*(.*)')
+    # Regex to match [0.03s - 17.36s] [SPEAKER_00]:  paragraph.... or just [SPEAKER_00]:
+    pattern = re.compile(r'(?:\[.*?\]\s*)?\[(SPEAKER_\d+)\]:\s*(.*)')
 
     for line in lines:
         line = line.strip()
