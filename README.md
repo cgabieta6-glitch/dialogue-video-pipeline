@@ -122,6 +122,14 @@ By default, the script appends `"meme funny"` to all Degoog searches to get more
 python search_provider.py --no-meme
 ```
 
+### 📝 Using Paragraph Text for Search
+Sometimes generating a short search query isn't enough, or you want to see what images standard providers return for the full dialogue text. You can tell the script to use the raw `paragraph` field instead of `image_search` by using the `--use-paragraph` flag:
+
+```bash
+# Use raw paragraph text for image searches
+python search_provider.py --use-paragraph
+```
+
 ## File Naming Convention
 
 The pipeline uses a **`done` prefix** to track which files have been processed:

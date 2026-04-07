@@ -78,7 +78,7 @@ class TripleTierProvider(ImageSearchProvider):
                 
                 ext = self.get_extension(img_url, content_type)
                 
-                safe_term = "".join([c if c.isalnum() else "_" for c in term]).strip()
+                safe_term = "".join([c if c.isalnum() else "_" for c in term]).strip()[:100]
                 prefix = f"{dialogue_id}_" if dialogue_id is not None else ""
                 img_name = os.path.join(self.download_dir, f"{prefix}{safe_term}{ext}")
                 
@@ -203,7 +203,7 @@ class TripleTierProvider(ImageSearchProvider):
         if not term: return None
         
         # 1. Local Cache Check
-        safe_term = "".join([c if c.isalnum() else "_" for c in term]).strip()
+        safe_term = "".join([c if c.isalnum() else "_" for c in term]).strip()[:100]
         prefix = f"{dialogue_id}_" if dialogue_id is not None else ""
         
         # Check both prefixed and non-prefixed as cache fallback
@@ -245,17 +245,17 @@ class TripleTierProvider(ImageSearchProvider):
 SearXNGProvider = TripleTierProvider
 
 
-def process_json_files(tier_order=None, include_meme=True):
+def process_json_files(tier_order=None, include_meme=True, use_paragraph=False):
     provider = TripleTierProvider(tier_order=tier_order, include_meme=include_meme)
     
-    # We will look for all JSON files that start with "done "
+    # We will look for all JSON files that DO NOT start with "done "
     for filename in os.listdir('.'):
-        if filename.startswith('done ') and filename.endswith('.json'):
+        if not filename.startswith('done ') and filename.endswith('.json'):
             print(f"\n--- Processing {filename} ---")
             print(f"--- Using Tiers: {provider.tier_order} ---")
             
             # Create a dedicated download folder named to avoid conflicts with existing .m4a files
-            folder_name = filename.replace('.json', '_images')  # e.g., "done chem_ch4_images"
+            folder_name = f"done {filename.replace('.json', '_images')}"  # e.g., "done chem_ch4_images"
             provider.download_dir = folder_name
             os.makedirs(provider.download_dir, exist_ok=True)
             
@@ -264,7 +264,7 @@ def process_json_files(tier_order=None, include_meme=True):
             
             updated = False
             for item in data:
-                term = item.get("image_search", "")
+                term = item.get("paragraph", "") if use_paragraph else item.get("image_search", "")
                 dialogue_id = item.get("id")
                 
                 # If we haven't already downloaded an image for this item
@@ -284,6 +284,16 @@ def process_json_files(tier_order=None, include_meme=True):
                 print(f"Successfully updated {filename} with downloaded images.")
             else:
                 print(f"No updates necessary for {filename}.")
+                
+            # Rename the file to have a "done " prefix when fully processed
+            done_filename = f"done {filename}"
+            try:
+                if os.path.exists(done_filename):
+                    os.remove(done_filename) # Prevent FileExistsError on Windows
+                os.rename(filename, done_filename)
+                print(f"Renamed {filename} to {done_filename}")
+            except Exception as e:
+                print(f"Error renaming {filename} to {done_filename}: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Triple-Tier Image Search Pipeline")
@@ -297,6 +307,11 @@ if __name__ == "__main__":
         "--no-meme", 
         action="store_true", 
         help="Disable adding 'meme funny' suffix to Degoog searches"
+    )
+    parser.add_argument(
+        "--use-paragraph", 
+        action="store_true", 
+        help="Use the full paragraph text for image search instead of the 'image_search' field"
     )
     args = parser.parse_args()
     
@@ -312,4 +327,4 @@ if __name__ == "__main__":
         print(f"Error parsing tiers: {e}. Defaulting to 1,2,3.")
         final_tiers = [1, 2, 3]
 
-    process_json_files(tier_order=final_tiers, include_meme=not args.no_meme)
+    process_json_files(tier_order=final_tiers, include_meme=not args.no_meme, use_paragraph=args.use_paragraph)
