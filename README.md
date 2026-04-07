@@ -1,6 +1,6 @@
 # Dialogue Video Pipeline
 
-> ⚠️ **Early Development Stage** — This project is still in its early stages. I'm a college student and will be updating this whenever I'm not busy with schoolwork. Contributions, suggestions, and feedback are welcome!
+> ⚠️ **Early Development Stage** — This project is still in its early stages. I will be updating this whenever I'm not busy with schoolwork. Contributions, suggestions, and feedback are welcome!
 
 An automated pipeline that transforms **NotebookLM Audio Overview** `.m4a` files into polished, landscape-oriented dialogue videos with synchronized scene images — powered by FFmpeg and parallel processing.
 
