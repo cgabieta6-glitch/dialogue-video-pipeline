@@ -26,7 +26,7 @@ If you record a new audio file (e.g., `stats_2a.m4a`) and generate a transcript 
 ### Step 1: `auto_segment.py`
 **What it does:** Converts raw transcript text files into structured `.json` dialogue files.
 ```powershell
-# Auto-discovers all "done *.txt" files in the current directory
+# Auto-discovers all unprocessed .txt files in the current directory
 python auto_segment.py
 
 # Or specify files explicitly

@@ -121,10 +121,10 @@ if __name__ == "__main__":
     if args.files:
         files_to_process = args.files
     else:
-        # Auto-discover all "done *.txt" files in the current directory
-        files_to_process = [f for f in os.listdir('.') if f.startswith('done ') and f.endswith('.txt')]
+        # Auto-discover all .txt files that have NOT been processed yet (no "done" prefix)
+        files_to_process = [f for f in os.listdir('.') if f.endswith('.txt') and not f.startswith('done ')]
         if not files_to_process:
-            print("No 'done *.txt' files found in the current directory. Pass filenames as arguments.")
+            print("No unprocessed .txt files found in the current directory. Pass filenames as arguments.")
             sys.exit(1)
 
     for f in files_to_process:
