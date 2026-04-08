@@ -33,7 +33,7 @@ def extract_image_keywords(paragraph, used_queries):
     # Try different combinations if already used
     base_query = " ".join(top_words).title()
     if not base_query:
-        base_query = "Data Statistics Visualization"
+        return "" # Let the caller handle conversational fillers
         
     query = base_query
     counter = 1
@@ -44,12 +44,15 @@ def extract_image_keywords(paragraph, used_queries):
     used_queries.add(query)
     return query
 
-def process_file(filename):
+def process_file(filename, use_paragraph=False):
     if not os.path.exists(filename):
         print(f"File {filename} not found.")
         return
 
     print(f"Processing {filename}...")
+    if use_paragraph:
+        print("  [Mode] Using full paragraph text as image_search")
+    
     with open(filename, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
@@ -71,7 +74,18 @@ def process_file(filename):
             character = match.group(1)
             paragraph = match.group(2).strip()
             
-            image_search = extract_image_keywords(paragraph, used_queries)
+            if use_paragraph:
+                # Use the full paragraph text as the search query
+                image_search = paragraph
+            else:
+                image_search = extract_image_keywords(paragraph, used_queries)
+            
+            # If the paragraph is just filler (e.g. "Yeah", "Right"), use the visual context of the previous line!
+            if not image_search and entries:
+                image_search = entries[-1]["image_search"]
+            # Failsafe if the very first line of the transcript is mysteriously empty of useful words
+            if not image_search:
+                image_search = "Background Visual Textures"
             
             entries.append({
                 "id": current_id,
@@ -91,15 +105,27 @@ def process_file(filename):
     print(f'Done! Created {out_name} with {len(entries)} items.')
 
 if __name__ == "__main__":
-    files_to_process = [
-        r'done stats 1.m4a.txt',
-        r'done stats 2a.m4a.txt',
-        r'done stats 2b.m4a.txt',
-        r'done stats 3a.m4a.txt',
-        r'done stats 3b.m4a.txt'
-    ]
-    
-    base_dir = r'c:\Users\carlg\Downloads\New folder (17)'
+    import argparse
+    parser = argparse.ArgumentParser(description="Auto-segment transcripts into JSON for the video pipeline.")
+    parser.add_argument(
+        "files", nargs="*",
+        help="Specific .txt files to process. If none given, processes all 'done *.txt' files in the current directory."
+    )
+    parser.add_argument(
+        "--use-paragraph",
+        action="store_true",
+        help="Use the full paragraph text as the 'image_search' field instead of extracted keywords"
+    )
+    args = parser.parse_args()
+
+    if args.files:
+        files_to_process = args.files
+    else:
+        # Auto-discover all "done *.txt" files in the current directory
+        files_to_process = [f for f in os.listdir('.') if f.startswith('done ') and f.endswith('.txt')]
+        if not files_to_process:
+            print("No 'done *.txt' files found in the current directory. Pass filenames as arguments.")
+            sys.exit(1)
+
     for f in files_to_process:
-        full_path = os.path.join(base_dir, f)
-        process_file(full_path)
+        process_file(f, use_paragraph=args.use_paragraph)

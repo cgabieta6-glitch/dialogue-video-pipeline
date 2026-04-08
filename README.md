@@ -26,7 +26,14 @@ If you record a new audio file (e.g., `stats_2a.m4a`) and generate a transcript 
 ### Step 1: `auto_segment.py`
 **What it does:** Converts raw transcript text files into structured `.json` dialogue files.
 ```powershell
+# Auto-discovers all "done *.txt" files in the current directory
 python auto_segment.py
+
+# Or specify files explicitly
+python auto_segment.py "done stats 2a.m4a.txt" "done chem ch4.m4a.txt"
+
+# Use the full paragraph as the image search query (instead of extracted keywords)
+python auto_segment.py --use-paragraph
 ```
 
 ### Step 2: `cut_audio.py`
