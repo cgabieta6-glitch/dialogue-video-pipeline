@@ -53,8 +53,19 @@ def process_file(filename, use_paragraph=False):
     if use_paragraph:
         print("  [Mode] Using full paragraph text as image_search")
     
-    with open(filename, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
+    # Try multiple encodings (some Windows apps save as UTF-16 with BOM)
+    lines = None
+    for enc in ['utf-8-sig', 'utf-16', 'utf-8']:
+        try:
+            with open(filename, 'r', encoding=enc) as f:
+                lines = f.readlines()
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    
+    if lines is None:
+        print(f"  [Error] Could not decode {filename} with any known encoding. Skipping.")
+        return
 
     entries = []
     current_id = 0
