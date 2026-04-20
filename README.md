@@ -16,23 +16,38 @@ An automated pipeline that transforms **NotebookLM Audio Overview** `.m4a` files
 |---|--------|-------------|
 | 1 | `auto_segment.py` | Converts raw `.txt` transcripts into structured `.json` dialogue files with speaker IDs, paragraphs, and image search terms |
 | 2 | `cut_audio.py` | Uses FFmpeg to slice the full `.m4a` audio into individual speaker segments based on timestamps |
-| 3 | `search_provider.py` | Downloads relevant images using a **3-tier fallback system** (see below) |
-| 4 | `make_video.py` | Renders all segments into 1280×720 landscape videos in parallel, stitches them into a final `.mp4`, exports to Google Drive, and auto-cleans all intermediate files |
+| 3 | `search_provider.py` | Downloads relevant images using a **18-tier fallback system** (see below) |
+| 3.5a | `preview_page.py` | *(Optional)* Generates a static HTML preview page showing each dialogue paragraph alongside its image |
+| 3.5b | `preview_editor.py` | *(Optional)* Interactive editor — click any image to search all 18 tiers and swap it. Changes save directly to the JSON |
+| 4a | `make_video.py` | Renders all segments into 1280x720 landscape videos in parallel, stitches them into a final `.mp4`, exports to Google Drive, and auto-cleans all intermediate files |
+| 4b | `make_website.py`| *(Alternative)* Generates a zero-render **Interactive Web Video Player**. Bundles audio, images, and HTML into a portable website folder you can send to anyone for instant playback in their browser. |
 
 ## 📖 Manual Execution Master Guide
 
 If you record a new audio file (e.g., `stats_2a.m4a`) and generate a transcript (`stats_2a.m4a.txt`), follow this exact flow to process it:
 
 ### Step 1: `auto_segment.py`
-**What it does:** Converts raw transcript text files into structured `.json` dialogue files.
+**What it does:** Converts raw transcript text files into structured `.json` dialogue files with intelligent image search query generation.
 ```powershell
-# Auto-discovers all unprocessed .txt files in the current directory
+# Auto-discovers all unprocessed .txt files in the current directory (default: spaCy Smart mode)
 python auto_segment.py
 
 # Or specify files explicitly
 python auto_segment.py "done stats 2a.m4a.txt" "done chem ch4.m4a.txt"
 
-# Use the full paragraph as the image search query (instead of extracted keywords)
+# Use KeyBERT BERT-embedding extraction (high quality semantic keywords)
+python auto_segment.py --use-keybert
+
+# Use Google Gemini Cloud LLM for best-quality queries (requires API key)
+python auto_segment.py --use-gemini --gemini-api-key "YOUR_KEY"
+
+# Use local Ollama LLM (requires Ollama running locally)
+python auto_segment.py --use-llm
+
+# Add semantic similarity boost to Smart mode (appends best visual category)
+python auto_segment.py --use-semantic
+
+# Use the full paragraph as the image search query (no processing)
 python auto_segment.py --use-paragraph
 ```
 
@@ -50,6 +65,23 @@ python cut_audio.py
 python search_provider.py --tiers 1,2,3
 ```
 *(Images are saved in `done stats 2a.m4a_images/`).*
+
+### Step 3.5a: `preview_page.py` *(Optional — Static Preview)*
+**What it does:** Generates a self-contained HTML page for quick visual review of all dialogues and their images.
+```powershell
+python preview_page.py
+```
+
+### Step 3.5b: `preview_editor.py` *(Optional — Interactive Editor)*
+**What it does:** Launches a local web server with an **invideo.ai-style media editor**. Click any image to search all 5 tiers and swap it — changes save directly to the JSON.
+```powershell
+# Auto-opens in your browser
+python preview_editor.py
+
+# Specify a file & port
+python preview_editor.py "done exercise no 10.json" --port 9000
+```
+*(Runs at `http://127.0.0.1:8090`. Press Ctrl+C to stop.)*
 
 ### Step 4: `make_video.py`
 **What it does:** The final step. Renders and stitches everything into an `.mp4`.
@@ -95,6 +127,30 @@ If you encounter a "Port is already in use" error:
 1. Open Task Manager and stop any applications using those ports.
 2. Or, modify the `docker-compose.yml` and `search_provider.py` to use different ports.
 
+### 🧠 Image Search Query Generation (`auto_segment.py`)
+
+`auto_segment.py` supports multiple extraction modes for generating image search queries from dialogue text. Each mode offers a different quality/speed tradeoff:
+
+| Flag | Mode | Description | Requirements |
+|------|------|-------------|--------------|
+| *(default)* | **Smart** | spaCy NLP noun-chunk extraction + Named Entity Recognition. Falls back to RAKE/YAKE if spaCy is unavailable. | `pip install spacy` |
+| `--use-keybert` | **KeyBERT** | BERT-embedding keyword extraction using Maximal Marginal Relevance for diverse, semantically relevant keywords. | `pip install keybert` |
+| `--use-semantic` | **Semantic Boost** | Enhancement for Smart mode — appends the best-matching visual category from 48 predefined categories using cosine similarity. | `pip install sentence-transformers` |
+| `--use-gemini` | **Gemini Cloud** | Google Gemini API for highest quality, context-aware query generation. Requires API key via `--gemini-api-key` or `GEMINI_API_KEY` env var. | API key only (no extra pip installs) |
+| `--use-llm` | **Ollama LLM** | Local Ollama LLM for offline intelligent query generation. | [Ollama](https://ollama.ai/) running locally |
+| `--use-paragraph` | **Paragraph** | Uses raw dialogue text as-is with no processing. | None |
+
+> 💡 **Recommended for best results:** `--use-gemini` for cloud-quality queries, or the default Smart mode + `--use-semantic` for fully offline, high-quality extraction.
+
+#### Installing NLP Dependencies
+```powershell
+# Full NLP stack (recommended)
+pip install spacy rake-nltk yake keybert sentence-transformers
+
+# Download spaCy's English model (auto-downloaded on first run if missing)
+python -m spacy download en_core_web_sm
+```
+
 ### Image Search: 3-Tier Fallback System (`search_provider.py`)
 
 The image downloader uses a triple-tier search strategy to maximize the chances of finding a relevant image for every dialogue segment:
@@ -103,7 +159,18 @@ The image downloader uses a triple-tier search strategy to maximize the chances 
 |------|----------|-------------|
 | 🥇 Tier 1 | **Degoog** (local) | Primary search engine. Appends `"meme funny"` to queries for more engaging, visual results. Runs locally via `http://127.0.0.1:8082`. |
 | 🥈 Tier 2 | **Wikimedia Commons** | Falls back to Wikimedia's free image library if Degoog fails or returns no results. Great for educational/scientific diagrams. |
-| 🥉 Tier 3 | **SearXNG** (local) | Last resort fallback. Queries the local SearXNG meta-search engine at `http://localhost:8080` for broader web image results. |
+| 🥉 Tier 3 | **SearXNG** (local) | Queries the local SearXNG meta-search engine at `http://localhost:8888` for broader web image results. |
+| 🎞️ Tier 4 | **Klipy** (GIF) | Searches the Klipy GIF API for animated GIFs. Requires `KLIPY_API_KEY` env variable. |
+| 🎞️ Tier 5 | **Giphy** (GIF) | Searches the Giphy API for animated GIFs. Requires `GIPHY_API_KEY` env variable. |
+| 📸 Tier 6 | **Unsplash** (API) | Direct Unsplash integration using provided access key. |
+| 📸 Tier 7 | **Pexels** (API) | Direct Pexels integration using provided auth token. |
+| 📸 Tier 8 | **Pixabay** (API) | Direct Pixabay integration using provided API key. |
+| 📸 Tier 9 | **Openverse** (API) | Openly-licensed media search engine via OAuth token. |
+| 🏛️ Tier 10 | **Int. Archive** (REST API) | Direct API integration with the Internet Archive image library. |
+| 🌿 Tier 11 | **iNaturalist** (Botany/Bio) | Search community-verified biological research photos via iNaturalist API. |
+| 🫀 Tier 12 | **Smart Servier** (Medical) | Scrapes high-quality biology, anatomy, and medical diagrams from Servier Medical Art. |
+| 🏛️ Tier 13 | **PDImageArchive** (Playwright) | Utilizes a headless Chromium browser to scrape public domain historical/biological images safely from behind JS firewalls. |
+| 🦜 Tier 14 | **GBIF Repo** (API) | Direct scientific integration via the Global Biodiversity Information Facility. |
 
 If one tier fails or returns no usable images, the system automatically tries the next tier before moving on.
 
@@ -111,15 +178,31 @@ If one tier fails or returns no usable images, the system automatically tries th
 You can manually choose which search providers to use and in what order by using the `--tiers` flag:
 
 ```bash
-# Default: Try Degoog, then Wikimedia, then SearXNG
-python search_provider.py --tiers 1,2,3
+# Default: Try all tiers in order
+python search_provider.py --tiers 1,2,3,4,5
 
 # Only use Wikimedia (Tier 2)
 python search_provider.py --tiers 2
 
 # Try SearXNG (Tier 3) first, then Degoog (Tier 1)
 python search_provider.py --tiers 3,1
+
+# Only use GIF providers (Klipy + Giphy)
+python search_provider.py --tiers 4,5
 ```
+
+### 🎞️ GIF Search Setup (Klipy & Giphy)
+To enable GIF search via Klipy and/or Giphy, set the following environment variables with your API keys:
+
+```powershell
+# Klipy (get a free key from https://docs.klipy.com)
+$env:KLIPY_API_KEY = "your_klipy_api_key_here"
+
+# Giphy (get a free key from https://developers.giphy.com/)
+$env:GIPHY_API_KEY = "your_giphy_api_key_here"
+```
+
+If the API key for a GIF tier is not set, that tier is **silently skipped** (no errors, it just moves to the next tier).
 
 ### 🖼️ Disabling "Meme" Suffix
 By default, the script appends `"meme funny"` to all Degoog searches to get more expressive results. If you want cleaner, more professional images, you can disable this:
@@ -220,6 +303,11 @@ The pipeline requires FFmpeg to handle all video and audio processing.
 ### 2. Python Dependencies
 - **Python 3.10+**
 - **tqdm** (`pip install tqdm` — auto-installed by the script if missing)
+- **NLP Libraries** *(optional but recommended for `auto_segment.py`)*:
+  - `spacy` — Smart noun-chunk extraction + NER (default mode)
+  - `rake-nltk` + `yake` — Statistical keyword extraction (fallback)
+  - `keybert` — BERT-embedding keyword extraction
+  - `sentence-transformers` — Semantic similarity visual category matching
 
 ### 3. Image Search
 - Local image search services (Degoog/SearXNG) are required for `search_provider.py`.
