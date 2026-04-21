@@ -4,11 +4,16 @@ import json
 import argparse
 import webbrowser
 import sys
+import base64
+import time
+
+# Cache buster for assets
+CACHE_BUSTER = int(time.time())
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-def build_html_content(title, segments):
+def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
     """Generate the static HTML string using the card layout with embedded JS player."""
     
     cards_html = ""
@@ -77,6 +82,11 @@ def build_html_content(title, segments):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playable Web Video — {title}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
+    <script>
+        {f'const pdfData = "{pdf_base64}";' if pdf_base64 else ''}
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -213,20 +223,146 @@ def build_html_content(title, segments):
             box-sizing: border-box;
         }}
 
+        /* PDF.js Rendering Styles */
+        .pdf-page-container {{
+            position: relative;
+            margin-bottom: 20px;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: inline-block;
+        }}
+        .pdf-page-container canvas {{
+            display: block;
+        }}
+        .textLayer {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            opacity: 1.0;
+            line-height: 1.0;
+            mix-blend-mode: multiply;
+        }}
+        .textLayer > span {{
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }}
+
+        /* Match Highlights */
+        .pdf-match-highlight {{
+            background-color: rgba(255, 255, 0, 0.4);
+            border-radius: 2px;
+            box-shadow: 0 0 4px rgba(255, 255, 0, 0.6);
+            padding: 1px 0;
+            margin: -1px 0;
+        }}
+        .card-match-highlight {{
+            border: 2px solid var(--accent) !important;
+            background: var(--active-shadow) !important;
+            box-shadow: 0 0 20px var(--active-shadow);
+        }}
+
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
-            padding: 2rem 1rem;
+            margin: 0;
+            padding: 0;
             transition: background 0.4s ease, color 0.4s ease;
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
+            overflow: hidden;
+        }}
+
+        .split-screen {{
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }}
+
+        .left-panel {{
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 2rem 1rem;
+            position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) transparent;
+        }}
+
+        .right-panel {{
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--card-bg);
+            border-left: 1px solid var(--card-border);
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }}
+
+        .pdf-controls {{
+            padding: 0.8rem;
+            border-bottom: 1px solid var(--header-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            z-index: 10;
+        }}
+
+        .pdf-upload-label {{
+            background: var(--accent);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .pdf-upload-label:hover {{
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }}
+
+        #pdf-viewer-container {{
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a1a;
+            position: relative;
+        }}
+
+        #pdf-viewer-container iframe, #pdf-viewer-container object {{
+            width: 100%;
+            height: 100%;
+            border: none;
+        }}
+
+        .pdf-placeholder {{
+            color: var(--subtext);
+            font-size: 1rem;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.5;
         }}
 
         .container {{
-            max-width: 1100px;
+            max-width: 100%;
             margin: 0 auto;
             position: relative;
         }}
@@ -435,7 +571,9 @@ def build_html_content(title, segments):
         .play-btn.floating {{
             position: fixed;
             bottom: 30px;
-            right: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            right: auto;
             box-shadow: 0 10px 25px var(--accent-shadow);
             z-index: 2000;
             padding: 1rem 2rem;
@@ -445,8 +583,8 @@ def build_html_content(title, segments):
         }}
 
         @keyframes popIn {{
-            from {{ transform: scale(0); opacity: 0; }}
-            to {{ transform: scale(1); opacity: 1; }}
+            from {{ transform: translateX(-50%) scale(0); opacity: 0; }}
+            to {{ transform: translateX(-50%) scale(1); opacity: 1; }}
         }}
 
         .card {{
@@ -483,6 +621,40 @@ def build_html_content(title, segments):
             min-width: 0;
             position: relative;
             z-index: 200; /* Ensure text sits above popping images */
+        }}
+
+        /* Right Panel: PDF */
+        .right-panel {{
+            flex: 1; background: #1a1a1a; overflow-y: scroll;
+            position: relative; scroll-behavior: smooth;
+        }}
+
+        .pdf-viewer-container {{
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 40px 20px; min-height: 100%;
+        }}
+
+        .pdf-page-container {{
+            position: relative; margin-bottom: 30px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: white; line-height: 0;
+        }}
+
+        /* PDF.js Text Layer - CRITICAL for alignment */
+        .textLayer {{
+            position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+            overflow: hidden; opacity: 0.2; line-height: 1.0;
+            mix-blend-mode: multiply;
+        }}
+        .textLayer span {{
+            color: transparent; position: absolute; white-space: pre;
+            cursor: text; transform-origin: 0% 0%;
+        }}
+
+        .pdf-match-highlight {{ 
+            background-color: rgba(255, 255, 0, 0.4); 
+            border-bottom: 2px solid orange;
+            border-radius: 2px;
         }}
 
         .card-header {{
@@ -620,6 +792,28 @@ def build_html_content(title, segments):
         .speaker-b .card-text {{ text-align: right; }}
         .speaker-b .card-header {{ justify-content: flex-end; }}
         .speaker-b .card-image {{ border-radius: 12px 0 0 12px; }}
+
+        @media (max-width: 1000px) {{
+            .split-screen {{
+                flex-direction: column;
+                height: auto;
+                overflow: visible;
+            }}
+            .left-panel, .right-panel {{
+                height: auto;
+                flex: none;
+                width: 100%;
+                overflow: visible;
+            }}
+            .right-panel {{
+                height: 80vh;
+                border-left: none;
+                border-top: 1px solid var(--card-border);
+            }}
+            body {{
+                overflow: auto;
+            }}
+        }}
 
         @media (max-width: 700px) {{
             .card {{ flex-direction: column !important; }}
@@ -777,78 +971,97 @@ def build_html_content(title, segments):
 </head>
 <body>
     <div id="progress-container"><div id="progress-bar"></div></div>
-    <div class="container">
-        <header>
-            <div class="title-section">
-                <h1>{title}</h1>
-                <p>{len(segments)} dialogue segments</p>
+    
+    <div class="split-screen">
+        <div class="left-panel">
+            <div class="container">
+                <header>
+                    <div class="title-section">
+                        <h1>{title}</h1>
+                        <p>{len(segments)} dialogue segments</p>
+                    </div>
+
+                    <div class="controls-row">
+                        <div class="search-wrapper">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" class="search-input" id="search-input" placeholder="Search script...">
+                        </div>
+
+                        <div class="study-tools">
+                            <button class="tool-toggle" id="focus-toggle" title="Cinematic Focus Mode">🎯 Focus</button>
+                            <select class="tool-toggle" id="speed-select" title="Playback Speed" style="padding: 5px 8px;">
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1.0x</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2.0x</option>
+                            </select>
+                        </div>
+
+                        <button class="play-btn" id="play-btn">▶ Play All</button>
+
+                        <div class="theme-picker" id="theme-picker">
+                            <span class="theme-dot active" data-theme="midnight" style="background:#0f1117;border:2px solid #444;" title="Midnight"></span>
+                            <span class="theme-dot" data-theme="ocean" style="background:#0a192f;" title="Ocean"></span>
+                            <span class="theme-dot" data-theme="sunset" style="background:linear-gradient(135deg,#ff9a6c,#ff6ba1);" title="Sunset"></span>
+                            <span class="theme-dot" data-theme="forest" style="background:#0d1b0f;" title="Forest"></span>
+                            <span class="theme-dot" data-theme="lavender" style="background:linear-gradient(135deg,#a582ff,#ff82c8);" title="Lavender"></span>
+                            <span class="theme-dot" data-theme="light" style="background:#f5f5f5;" title="Light"></span>
+                        </div>
+
+                        <div class="bg-controls">
+                            <button class="bg-btn" id="bg-img-btn" title="Upload Background Image">🖼️ Image</button>
+                            <input type="color" id="bg-color-picker" title="Pick Background Color" value="#0f1117">
+                            <input type="file" id="bg-upload" accept="image/*" style="display:none">
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Hidden audio element -->
+                <audio id="audio-player" src=""></audio>
+                
+                <!-- Floating Highlighter Button -->
+                <button id="highlighter-btn">Highlight</button>
+
+                <!-- Sticky Note Toggle -->
+                <button id="note-toggle" title="Toggle Sticky Note">📝</button>
+                <div id="sticky-note">
+                    <div class="note-header">
+                        <span>📌 Notes</span>
+                        <button id="note-close">✕</button>
+                    </div>
+                    <textarea placeholder="Jot down your notes here..."></textarea>
+                </div>
+
+                <!-- Drawing Mode -->
+                <canvas id="drawing-canvas"></canvas>
+                <button id="draw-toggle-btn" class="tool-btn" title="Toggle Drawing Mode">🖌️</button>
+                <div class="drawing-toolbox" id="draw-toolbox">
+                    <button class="tool-btn active" style="background:#ff4444" data-color="#ff4444"></button>
+                    <button class="tool-btn" style="background:#44ff44" data-color="#44ff44"></button>
+                    <button class="tool-btn" style="background:#facc15" data-color="#facc15"></button>
+                    <button class="tool-btn" style="background:#ffffff" data-color="#ffffff"></button>
+                    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1)">
+                    <button class="tool-btn" id="draw-clear" title="Clear Drawing" style="background:#333; color:white">🗑️</button>
+                </div>
+
+                {cards_html}
             </div>
-
-            <div class="controls-row">
-                <div class="search-wrapper">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" class="search-input" id="search-input" placeholder="Search script...">
-                </div>
-
-                <div class="study-tools">
-                    <button class="tool-toggle" id="focus-toggle" title="Cinematic Focus Mode">🎯 Focus</button>
-                    <select class="tool-toggle" id="speed-select" title="Playback Speed" style="padding: 5px 8px;">
-                        <option value="0.75">0.75x</option>
-                        <option value="1" selected>1.0x</option>
-                        <option value="1.25">1.25x</option>
-                        <option value="1.5">1.5x</option>
-                        <option value="2">2.0x</option>
-                    </select>
-                </div>
-
-                <button class="play-btn" id="play-btn">▶ Play All</button>
-
-                <div class="theme-picker" id="theme-picker">
-                    <span class="theme-dot active" data-theme="midnight" style="background:#0f1117;border:2px solid #444;" title="Midnight"></span>
-                    <span class="theme-dot" data-theme="ocean" style="background:#0a192f;" title="Ocean"></span>
-                    <span class="theme-dot" data-theme="sunset" style="background:linear-gradient(135deg,#ff9a6c,#ff6ba1);" title="Sunset"></span>
-                    <span class="theme-dot" data-theme="forest" style="background:#0d1b0f;" title="Forest"></span>
-                    <span class="theme-dot" data-theme="lavender" style="background:linear-gradient(135deg,#a582ff,#ff82c8);" title="Lavender"></span>
-                    <span class="theme-dot" data-theme="light" style="background:#f5f5f5;" title="Light"></span>
-                </div>
-
-                <div class="bg-controls">
-                    <button class="bg-btn" id="bg-img-btn" title="Upload Background Image">🖼️ Image</button>
-                    <input type="color" id="bg-color-picker" title="Pick Background Color" value="#0f1117">
-                    <input type="file" id="bg-upload" accept="image/*" style="display:none">
-                </div>
-            </div>
-        </header>
-
-        <!-- Hidden audio element -->
-        <audio id="audio-player" src=""></audio>
-        
-        <!-- Floating Highlighter Button -->
-        <button id="highlighter-btn">Highlight</button>
-
-        <!-- Sticky Note Toggle -->
-        <button id="note-toggle" title="Toggle Sticky Note">📝</button>
-        <div id="sticky-note">
-            <div class="note-header">
-                <span>📌 Notes</span>
-                <button id="note-close">✕</button>
-            </div>
-            <textarea placeholder="Jot down your notes here..."></textarea>
         </div>
 
-        <!-- Drawing Mode -->
-        <canvas id="drawing-canvas"></canvas>
-        <button id="draw-toggle-btn" class="tool-btn" title="Toggle Drawing Mode">🖌️</button>
-        <div class="drawing-toolbox" id="draw-toolbox">
-            <button class="tool-btn active" style="background:#ff4444" data-color="#ff4444"></button>
-            <button class="tool-btn" style="background:#44ff44" data-color="#44ff44"></button>
-            <button class="tool-btn" style="background:#facc15" data-color="#facc15"></button>
-            <button class="tool-btn" style="background:#ffffff" data-color="#ffffff"></button>
-            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1)">
-            <button class="tool-btn" id="draw-clear" title="Clear Drawing" style="background:#333; color:white">🗑️</button>
+        <div class="right-panel">
+            <div class="pdf-controls">
+                <div class="pdf-header">
+                    <span>📄 Script Viewer (Interactive)</span>
+                </div>
+            </div>
+            <div id="pdf-viewer-container">
+                <div id="pdf-fallback" class="pdf-placeholder" style="display: {'none' if has_pdf else 'flex'}; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 2rem;">
+                    <p>To view your script, place a PDF named <strong>script.pdf</strong> into the <strong>assets</strong> folder.</p>
+                </div>
+                <!-- PDF pages will be rendered here -->
+            </div>
         </div>
-
-        {cards_html}
     </div>
 
 <script>
@@ -914,6 +1127,186 @@ def build_html_content(title, segments):
                 localStorage.setItem(storageKey + '_anno_' + id, e.target.value);
             }});
         }});
+
+        // PDF.js Integration Logic
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pdfDoc = null;
+        let pageRendering = new Set();
+        let renderedPages = new Set();
+
+        async function initPDFViewer(base64Data) {{
+            console.log("Initializing PDF Viewer...");
+            try {{
+                // Convert base64 to binary
+                const binaryString = atob(base64Data);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {{
+                    bytes[i] = binaryString.charCodeAt(i);
+                }}
+                
+                // disableWorker: true is critical for file:// protocol support
+                pdfDoc = await pdfjsLib.getDocument({{ 
+                    data: bytes,
+                    disableWorker: true,
+                    verbosity: 0
+                }}).promise;
+                
+                console.log("PDF Document Loaded. Pages:", pdfDoc.numPages);
+                
+                for (let i = 1; i <= pdfDoc.numPages; i++) {{
+                    const pageContainer = document.createElement('div');
+                    pageContainer.className = 'pdf-page-container';
+                    pageContainer.id = 'pdf-page-' + i;
+                    pageContainer.dataset.pageNumber = i;
+                    pdfViewerContainer.appendChild(pageContainer);
+                    
+                    // Intersection Observer for Lazy Loading
+                    const observer = new IntersectionObserver((entries) => {{
+                        if (entries[0].isIntersecting) {{
+                            renderPage(i);
+                        }}
+                    }}, {{ root: pdfViewerContainer, threshold: 0.1 }});
+                    observer.observe(pageContainer);
+                }}
+            }} catch (e) {{
+                console.error("PDF.js Error:", e);
+                pdfFallback.innerHTML = `<h2>PDF Load Error</h2><p>${{e.message}}</p>`;
+                pdfFallback.style.display = 'flex';
+            }}
+        }}
+
+        // PDF Initialization
+        const pdfFallback = document.getElementById('pdf-fallback');
+        
+        if (typeof pdfData !== 'undefined' && pdfData) {{
+            pdfFallback.style.display = 'none';
+            initPDFViewer(pdfData);
+        }} else {{
+            console.warn("No PDF Data found in HTML.");
+            pdfFallback.style.display = 'flex';
+        }}
+
+        async function renderPage(pageNum) {{
+            if (renderedPages.has(pageNum) || pageRendering.has(pageNum)) return;
+            pageRendering.add(pageNum);
+
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({{ scale: 1.5 }});
+            const container = document.getElementById('pdf-page-' + pageNum);
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            container.style.width = viewport.width + 'px';
+            container.style.height = viewport.height + 'px';
+            container.appendChild(canvas);
+
+            const renderContext = {{ canvasContext: context, viewport: viewport }};
+            await page.render(renderContext).promise;
+
+            const textLayerDiv = document.createElement('div');
+            textLayerDiv.className = 'textLayer';
+            container.appendChild(textLayerDiv);
+
+            const textContent = await page.getTextContent();
+            await pdfjsLib.renderTextLayer({{
+                textContent: textContent,
+                container: textLayerDiv,
+                viewport: viewport,
+                textDivs: []
+            }}).promise;
+
+            renderedPages.add(pageNum);
+            pageRendering.delete(pageNum);
+        }}
+
+        // Normalization Utility for Fuzzy Matching
+        function normalizeText(text) {{
+            return text.toLowerCase().replace(/[^\\w\\s]/g, '').replace(/\\s+/g, ' ').trim();
+        }}
+
+        // Bidirectional Highlighting Logic
+        document.addEventListener('selectionchange', () => {{
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            if (selectedText.length < 3) return;
+
+            const range = selection.getRangeAt(0);
+            const container = range.commonAncestorContainer.parentElement;
+
+            // Clear previous highlights
+            document.querySelectorAll('.pdf-match-highlight').forEach(el => {{
+                const parent = el.parentNode;
+                while (el.firstChild) parent.insertBefore(el.firstChild, el);
+                parent.removeChild(el);
+            }});
+            document.querySelectorAll('.card-match-highlight').forEach(el => el.classList.remove('card-match-highlight'));
+
+            const normalizedSelected = normalizeText(selectedText);
+
+            // Left to Right (Card -> PDF)
+            if (container.closest('.left-panel')) {{
+                syncToPDF(normalizedSelected);
+            }} 
+            // Right to Left (PDF -> Card)
+            else if (container.closest('.right-panel')) {{
+                syncToCard(normalizedSelected);
+            }}
+        }});
+
+        function syncToPDF(normalizedText) {{
+            const spans = document.querySelectorAll('.textLayer span');
+            let found = false;
+            for (let span of spans) {{
+                if (normalizeText(span.textContent).includes(normalizedText)) {{
+                    const regex = new RegExp(`(${{normalizedText.split('').join('[\\\\s\\\\W]*')}})`, 'gi');
+                    span.innerHTML = span.textContent.replace(regex, '<span class="pdf-match-highlight">$1</span>');
+                    
+                    if (!found) {{
+                        span.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                        found = true;
+                    }}
+                }}
+            }}
+            
+            if (!found) {{
+                console.log("No match found in currently rendered pages. Searching document...");
+                searchAllPages(normalizedText);
+            }}
+        }}
+
+        async function searchAllPages(normalizedText) {{
+            if (!pdfDoc) return;
+            for (let i = 1; i <= pdfDoc.numPages; i++) {{
+                const page = await pdfDoc.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = normalizeText(textContent.items.map(item => item.str).join(' '));
+                
+                if (pageText.includes(normalizedText)) {{
+                    const container = document.getElementById('pdf-page-' + i);
+                    container.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                    // Rendering will be triggered by IntersectionObserver
+                    break;
+                }}
+            }}
+        }}
+
+        function syncToCard(normalizedText) {{
+            const cards = document.querySelectorAll('.card');
+            for (let card of cards) {{
+                const paragraph = card.querySelector('.paragraph');
+                if (normalizeText(paragraph.textContent).includes(normalizedText)) {{
+                    card.classList.add('card-match-highlight');
+                    card.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    break;
+                }}
+            }}
+        }}
     }});
     
     const audio = document.getElementById('audio-player');
@@ -989,9 +1382,9 @@ def build_html_content(title, segments):
         }}
     }});
 
-    // Floating Button Logic
-    window.addEventListener('scroll', () => {{
-        if (window.scrollY > 200) {{
+    // Floating Button Logic (Listen to left-panel scroll)
+    document.querySelector('.left-panel').addEventListener('scroll', (e) => {{
+        if (e.target.scrollTop > 200) {{
             playBtn.classList.add('floating');
         }} else {{
             playBtn.classList.remove('floating');
@@ -1092,8 +1485,9 @@ def build_html_content(title, segments):
             
             if (isParagraph) {{
                 highlightBtn.style.display = 'block';
-                highlightBtn.style.top = (window.scrollY + rect.top - 30) + 'px';
-                highlightBtn.style.left = (window.scrollX + rect.left + (rect.width/2) - 35) + 'px';
+                const leftPanel = document.querySelector('.left-panel');
+                highlightBtn.style.top = (leftPanel.scrollTop + rect.top - 30) + 'px';
+                highlightBtn.style.left = (leftPanel.scrollLeft + rect.left + (rect.width/2) - 35) + 'px';
             }} else {{
                 highlightBtn.style.display = 'none';
             }}
@@ -1205,7 +1599,7 @@ def build_html_content(title, segments):
                 playBtn.innerHTML = '⏸ Pause';
                 
                 // Always show the floating button if they started playing from somewhere deep
-                if (window.scrollY > 200) {{
+                if (document.querySelector('.left-panel').scrollTop > 200) {{
                     playBtn.classList.add('floating');
                 }}
                 
@@ -1395,10 +1789,53 @@ def main():
         project_dir = os.path.join(OUTPUT_DIR, raw_name)
         assets_dir = os.path.join(project_dir, "assets")
         
-        if os.path.exists(project_dir):
-            shutil.rmtree(project_dir)
-            
+        # SAFETY UPDATE: Do not delete the project directory. 
+        # This preserves manually placed files like PDFs in the assets folder.
         os.makedirs(assets_dir, exist_ok=True)
+
+        has_pdf = False
+        
+        # 1. Check for ANY existing PDF in the assets folder and AUTO-RENAME to script.pdf
+        existing_assets = os.listdir(assets_dir)
+        pdfs_in_assets = [f for f in existing_assets if f.lower().endswith('.pdf')]
+        
+        if pdfs_in_assets:
+            if "script.pdf" not in pdfs_in_assets:
+                # Rename the first PDF found to script.pdf so the website can load it
+                shutil.move(os.path.join(assets_dir, pdfs_in_assets[0]), os.path.join(assets_dir, "script.pdf"))
+                print(f"  [INFO] Auto-renamed '{pdfs_in_assets[0]}' to 'script.pdf' in assets.")
+            has_pdf = True
+            print(f"  [INFO] Script PDF is ready in assets folder.")
+
+        # 2. Robust PDF Search for NEW files in root to copy over
+        search_dirs = [os.getcwd(), os.path.dirname(os.path.abspath(__file__))]
+        found_pdf_path = None
+        
+        for s_dir in search_dirs:
+            pdf_files = [f for f in os.listdir(s_dir) if f.lower().endswith('.pdf')]
+            if pdf_files:
+                found_pdf_path = os.path.join(s_dir, pdf_files[0])
+                break
+        
+        if found_pdf_path:
+            print(f"  [INFO] New PDF found in root: '{os.path.basename(found_pdf_path)}'. Updating assets/script.pdf...")
+            shutil.copy2(found_pdf_path, os.path.join(assets_dir, "script.pdf"))
+            has_pdf = True
+
+        # 3. Base64 encode for file:// protocol support
+        pdf_encoded_string = None
+        if has_pdf:
+            import base64
+            final_pdf = os.path.join(assets_dir, "script.pdf")
+            try:
+                with open(final_pdf, "rb") as pdf_file:
+                    pdf_encoded_string = base64.b64encode(pdf_file.read()).decode('utf-8')
+                print(f"  [SUCCESS] Inlining PDF data for {raw_name} ({len(pdf_encoded_string)//1024} KB)")
+            except Exception as e:
+                print(f"  [ERROR] Failed to read PDF: {e}")
+                has_pdf = False
+        elif not has_pdf:
+            print(f"  [WARNING] No PDF found in search dirs or assets folder. Fallback message will be shown.")
 
         with open(jf, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -1438,7 +1875,7 @@ def main():
                 "media_path": out_image_rel
             })
 
-        html_content = build_html_content(raw_name, web_segments)
+        html_content = build_html_content(raw_name, web_segments, has_pdf=has_pdf, pdf_base64=pdf_encoded_string)
         html_path = os.path.join(project_dir, "index.html")
         
         with open(html_path, "w", encoding="utf-8") as f:
