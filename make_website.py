@@ -635,15 +635,18 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
 
         .pdf-page-container {{
-            position: relative; margin-bottom: 30px; 
+            position: relative;
+            display: inline-block; /* Hugs the canvas to keep text aligned */
+            margin: 0 auto 30px auto; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            background: white; line-height: 0;
+            background: white;
+            line-height: 0;
         }}
 
         /* PDF.js Text Layer - CRITICAL for alignment */
         .textLayer {{
             position: absolute; left: 0; top: 0; right: 0; bottom: 0;
-            overflow: hidden; opacity: 0.2; line-height: 1.0;
+            overflow: hidden; line-height: 1.0;
             mix-blend-mode: multiply;
         }}
         .textLayer span {{
@@ -1138,38 +1141,43 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         let renderedPages = new Set();
 
         async function initPDFViewer(base64Data) {{
-            console.log("Initializing PDF Viewer...");
+            console.log("Initializing Optimized PDF Viewer...");
             try {{
-                // Convert base64 to binary
                 const binaryString = atob(base64Data);
-                const len = binaryString.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {{
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {{
                     bytes[i] = binaryString.charCodeAt(i);
                 }}
                 
-                // disableWorker: true is critical for file:// protocol support
                 pdfDoc = await pdfjsLib.getDocument({{ 
                     data: bytes,
                     disableWorker: true,
                     verbosity: 0
                 }}).promise;
                 
-                console.log("PDF Document Loaded. Pages:", pdfDoc.numPages);
-                
+                const observer = new IntersectionObserver((entries) => {{
+                    entries.forEach(entry => {{
+                        if (entry.isIntersecting) {{
+                            const num = parseInt(entry.target.dataset.pageNumber);
+                            renderPage(num);
+                        }}
+                    }});
+                }}, {{ 
+                    root: pdfViewerContainer, 
+                    rootMargin: '500px 0px', // Proactive loading
+                    threshold: 0.01 
+                }});
+
                 for (let i = 1; i <= pdfDoc.numPages; i++) {{
                     const pageContainer = document.createElement('div');
                     pageContainer.className = 'pdf-page-container';
                     pageContainer.id = 'pdf-page-' + i;
                     pageContainer.dataset.pageNumber = i;
-                    pdfViewerContainer.appendChild(pageContainer);
                     
-                    // Intersection Observer for Lazy Loading
-                    const observer = new IntersectionObserver((entries) => {{
-                        if (entries[0].isIntersecting) {{
-                            renderPage(i);
-                        }}
-                    }}, {{ root: pdfViewerContainer, threshold: 0.1 }});
+                    // Loading skeleton
+                    pageContainer.innerHTML = '<div style="display:flex; height:100%; align-items:center; justify-content:center; color:#555; font-size:0.8rem;">Loading Page...</div>';
+                    
+                    pdfViewerContainer.appendChild(pageContainer);
                     observer.observe(pageContainer);
                 }}
             }} catch (e) {{
@@ -1194,35 +1202,63 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             if (renderedPages.has(pageNum) || pageRendering.has(pageNum)) return;
             pageRendering.add(pageNum);
 
-            const page = await pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({{ scale: 1.5 }});
-            const container = document.getElementById('pdf-page-' + pageNum);
-            
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            container.style.width = viewport.width + 'px';
-            container.style.height = viewport.height + 'px';
-            container.appendChild(canvas);
+            try {{
+                const page = await pdfDoc.getPage(pageNum);
+                const baseScale = 1.5;
+                const viewport = page.getViewport({{ scale: baseScale }});
+                const container = document.getElementById('pdf-page-' + pageNum);
+                
+                // Clear loading skeleton
+                container.innerHTML = '';
 
-            const renderContext = {{ canvasContext: context, viewport: viewport }};
-            await page.render(renderContext).promise;
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
 
-            const textLayerDiv = document.createElement('div');
-            textLayerDiv.className = 'textLayer';
-            container.appendChild(textLayerDiv);
+                // CRITICAL: High-DPI Display Scaling
+                const outputScale = window.devicePixelRatio || 1;
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                container.style.width = Math.floor(viewport.width) + "px";
+                container.style.height = Math.floor(viewport.height) + "px";
+                
+                container.appendChild(canvas);
 
-            const textContent = await page.getTextContent();
-            await pdfjsLib.renderTextLayer({{
-                textContent: textContent,
-                container: textLayerDiv,
-                viewport: viewport,
-                textDivs: []
-            }}).promise;
+                const transform = outputScale !== 1 
+                    ? [outputScale, 0, 0, outputScale, 0, 0] 
+                    : null;
 
-            renderedPages.add(pageNum);
-            pageRendering.delete(pageNum);
+                const renderContext = {{
+                    canvasContext: context,
+                    transform: transform,
+                    viewport: viewport
+                }};
+                
+                await page.render(renderContext).promise;
+
+                // Text Layer with Scale Factor and Explicit Dimensions
+                const textLayerDiv = document.createElement('div');
+                textLayerDiv.className = 'textLayer';
+                textLayerDiv.style.width = viewport.width + 'px';
+                textLayerDiv.style.height = viewport.height + 'px';
+                textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+                container.appendChild(textLayerDiv);
+
+                const textContent = await page.getTextContent();
+                await pdfjsLib.renderTextLayer({{
+                    textContentSource: textContent,
+                    container: textLayerDiv,
+                    viewport: viewport,
+                    textDivs: []
+                }}).promise;
+
+                renderedPages.add(pageNum);
+            }} catch (e) {{
+                console.error("Error rendering page " + pageNum, e);
+            }} finally {{
+                pageRendering.delete(pageNum);
+            }}
         }}
 
         // Normalization Utility for Fuzzy Matching
