@@ -55,7 +55,10 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
                 <div class="card-header">
                     <span class="badge">{speaker_label}</span>
                     <span class="id-badge">#{dialogue_id}</span>
-                    <button class="anno-btn" onclick="toggleAnno({dialogue_id})" title="Annotate this segment">💬</button>
+                    <div class="card-actions">
+                        <button class="card-play-btn" onclick="playSegmentById({dialogue_id})" title="Play this segment">▶</button>
+                        <button class="anno-btn" onclick="toggleAnno({dialogue_id})" title="Annotate this segment">💬</button>
+                    </div>
                 </div>
                 <p class="paragraph">{safe_paragraph}</p>
                 <div class="anno-area" id="anno-area-{dialogue_id}">
@@ -277,7 +280,20 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
         .pulse-highlight {{
             box-shadow: 0 0 15px #fff, 0 0 25px #facc15 !important;
-            transform: scale(1.1);
+            transform: scale(1.05);
+            transition: all 0.2s ease;
+        }}
+        
+        .pdf-playback-pulse {{
+            animation: pdfPulse 1.5s infinite alternate ease-in-out;
+            background: rgba(239, 68, 68, 0.4) !important;
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }}
+        
+        @keyframes pdfPulse {{
+            from {{ opacity: 0.4; transform: scale(1.0); }}
+            to {{ opacity: 0.8; transform: scale(1.02); }}
         }}
 
         /* Playback specific highlight */
@@ -314,23 +330,30 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             gap: 10px;
         }}
         .editable-active {{
-            outline: 1px dashed #facc15 !important;
-            background: white !important; /* Mask the original PDF text underneath */
-            color: black !important;      /* Make your new text visible */
-            z-index: 100 !important;
-            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            outline: 2px dashed #facc15 !important;
+            background: rgba(255, 255, 255, 0.9) !important; /* High-contrast background for editing */
+            color: black !important;      
+            z-index: 1000 !important;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
             mix-blend-mode: normal !important;
+            padding: 2px;
+            border-radius: 2px;
         }}
         .editable-active:focus {{
-            outline: 2px solid #facc15 !important;
+            outline: 3px solid #facc15 !important;
             background: white !important;
             color: black !important;
-            z-index: 101 !important;
+            z-index: 1001 !important;
+        }}
+        /* Ensure text layer is clickable during edit mode */
+        .split-screen:has(.editable-active) .textLayer {{
+            z-index: 5000 !important;
+            pointer-events: auto !important;
         }}
         /* Dim the canvas slightly when editing to focus on text layer */
         .split-screen:has(.editable-active) .pdf-page-container canvas {{
-            opacity: 0.4;
-            filter: grayscale(1);
+            opacity: 0.3;
+            filter: grayscale(1) blur(1px);
         }}
         .panel-content {{
             flex: 1;
@@ -363,28 +386,34 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             position: absolute;
             left: 0;
             width: 100%;
-            height: 3px;
+            height: 4px;
             background: #facc15;
             box-shadow: 0 0 8px rgba(250, 204, 21, 0.6);
             border-radius: 0;
             z-index: 10;
             cursor: pointer;
-            transition: transform 0.1s;
+            transition: all 0.2s;
         }}
         .scroll-marker:hover {{
-            transform: scaleY(2);
+            height: 10px;
             background: #fff;
             z-index: 20;
+            box-shadow: 0 0 15px #fff;
+        }}
+        .scroll-marker.active {{
+            background: #ef4444;
+            box-shadow: 0 0 12px #ef4444;
+            height: 6px;
+            z-index: 15;
         }}
         
         .split-screen {{
             display: flex;
             flex-direction: row;
-            height: 100vh;
+            height: calc(100vh - 10px); /* Fill screen minus top margin if any */
             gap: 0;
             background: #1a1a2e;
             overflow: hidden;
-            position: relative;
         }}
 
         /* Orientation and Swapping */
@@ -434,135 +463,22 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             display: none !important;
         }}
         
-        .panel-outer {{
-            position: relative;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            background: rgba(0,0,0,0.2);
-        }}
-        .panel-outer:nth-of-type(1) {{
+        .panel-outer:nth-child(1) {{
             flex: 0 0 50%;
             min-width: 200px;
             min-height: 200px;
         }}
-        .panel-outer:nth-of-type(2) {{
+        .panel-outer:nth-child(3) {{
             flex: 1;
             min-width: 200px;
             min-height: 200px;
         }}
 
-        /* --- LEED-STYLE FLOATING TOOLBAR --- */
-        .floating-toolbar {{
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 17, 23, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 8px 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 9999;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }}
-        .floating-toolbar:hover {{
-            background: rgba(15, 17, 23, 0.95);
-            bottom: 35px;
-        }}
-        .tool-group {{
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 0 8px;
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-        }}
-        .tool-group:last-child {{ border-right: none; }}
-        
-        .leed-btn {{
-            background: transparent;
-            border: none;
-            color: #94a3b8;
-            width: 42px;
-            height: 42px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1.2rem;
-            position: relative;
-        }}
-        .leed-btn:hover {{
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-        }}
-        .leed-btn.active {{
-            background: #facc15;
-            color: #0f1117;
-            box-shadow: 0 0 15px rgba(250, 204, 21, 0.4);
-        }}
-        .leed-btn[title]:hover::after {{
-            content: attr(title);
-            position: absolute;
-            bottom: 130%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1e293b;
-            color: #fff;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            white-space: nowrap;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            pointer-events: none;
-        }}
-
-        /* --- OVERLAY ANNOTATIONS --- */
-        .pdf-annotation-text {{
-            position: absolute;
-            background: transparent;
-            border: 1px dashed transparent;
-            color: #facc15;
-            font-family: 'Outfit', sans-serif;
-            font-size: 14px;
-            padding: 2px 4px;
-            cursor: move;
-            z-index: 1000;
-            white-space: nowrap;
-            min-width: 20px;
-        }}
-        .pdf-annotation-text:hover {{
-            border-color: rgba(250, 204, 21, 0.5);
-            background: rgba(250, 204, 21, 0.05);
-        }}
-        .pdf-annotation-text.editing {{
-            border-color: #facc15;
-            background: rgba(0,0,0,0.8);
-            outline: none;
-        }}
-
-        /* --- PANEL CLEANUP --- */
-        .header-content, .pdf-controls {{
-            display: none !important; /* Hide old UI */
-        }}
-        .panel-content {{
-            padding-top: 10px; /* More room without header */
-        }}
-        .split-screen {{
-            height: 100vh;
-        }}
-
         /* PDF Panel Hiding */
-        .pdf-hidden .panel-outer:nth-of-type(2) {{
+        .pdf-hidden .panel-outer:nth-child(2) {{
             display: none !important;
         }}
-        .pdf-hidden .panel-outer:nth-of-type(1) {{
+        .pdf-hidden .panel-outer:nth-child(1) {{
             flex: 1;
             max-width: 100%;
         }}
@@ -574,11 +490,23 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
 
         body {{
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg);
             color: var(--text);
+            min-height: 100vh;
             margin: 0;
             padding: 0;
+            transition: background 0.4s ease, color 0.4s ease;
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            overflow: hidden;
+        }}
+
+        .split-screen {{
+            display: flex;
+            height: 100vh;
+            width: 100vw;
             overflow: hidden;
         }}
 
@@ -586,7 +514,10 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             flex: 1;
             height: 100vh;
             overflow-y: auto;
+            padding: 2rem 1rem;
             position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) transparent;
         }}
 
         .right-panel {{
@@ -594,9 +525,55 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             display: flex;
             flex-direction: column;
             background: #121212;
+            border-left: 1px solid var(--card-border);
             height: 100vh;
             overflow-y: auto;
             position: relative;
+            scroll-behavior: smooth;
+        }}
+
+        .pdf-controls {{
+            padding: 0.8rem;
+            border-bottom: 1px solid var(--header-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--card-bg);
+            z-index: 100;
+        }}
+        .clear-highlights-btn {{
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--subtext);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .clear-highlights-btn:hover {{
+            background: #ef4444;
+            color: white;
+            border-color: #ef4444;
+        }}
+
+        .pdf-upload-label {{
+            background: var(--accent);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .pdf-upload-label:hover {{
+            background: var(--accent-hover);
+            transform: translateY(-1px);
         }}
 
         #pdf-viewer-container {{
@@ -606,7 +583,28 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             align-items: center;
             padding: 40px 20px;
             background: #1a1a1a;
+            position: relative;
             min-height: 100%;
+        }}
+
+        #pdf-viewer-container iframe, #pdf-viewer-container object {{
+            width: 100%;
+            height: 100%;
+            border: none;
+        }}
+
+        .pdf-placeholder {{
+            color: var(--subtext);
+            font-size: 1rem;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.5;
+        }}
+
+        .container {{
+            max-width: 100%;
+            margin: 0 auto;
+            position: relative;
         }}
 
         /* Progress Tracker */
@@ -868,8 +866,37 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         .card-header {{
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 0.5rem;
             margin-bottom: 0.6rem;
+        }}
+        .card-actions {{
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }}
+        .card-play-btn {{
+            background: var(--accent);
+            color: white;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }}
+        .card-play-btn:hover {{
+            transform: scale(1.1);
+            background: var(--accent-hover);
+        }}
+        .card.active .card-play-btn {{
+            background: white;
+            color: var(--accent);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
         }}
 
         .badge {{
@@ -1181,26 +1208,6 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
     <div id="progress-container"><div id="progress-bar"></div></div>
     
     <div class="split-screen">
-        <!-- Floating LEED-Style Toolbar -->
-        <div class="floating-toolbar">
-            <div class="tool-group">
-                <button class="leed-btn active" data-tool="select" title="Selection Tool">🏹</button>
-                <button class="leed-btn" data-tool="highlight" title="Text Highlighter">🖍️</button>
-                <button class="leed-btn" data-tool="text" title="Type Annotation">⌨️</button>
-                <button class="leed-btn" data-tool="draw" title="Sketch/Draw">🖌️</button>
-                <button class="leed-btn" id="leed-eraser" title="Clear All Annotations">🗑️</button>
-            </div>
-            <div class="tool-group">
-                <button class="leed-btn" id="leed-swap" title="Swap Panels">⇄</button>
-                <button class="leed-btn" id="leed-flip" title="Vertical/Horizontal Flip">⊟</button>
-                <button class="leed-btn active" id="leed-pdf" title="Show/Hide PDF">📄</button>
-            </div>
-            <div class="tool-group">
-                <button class="leed-btn" id="leed-focus" title="Cinematic Focus Mode">🎯</button>
-                <button class="leed-btn" id="leed-play" title="Play All Dialogue">▶</button>
-                <button class="leed-btn" id="leed-theme" title="Cycle Themes">🌓</button>
-            </div>
-        </div>
         <!-- Left Panel: Dialogue Cards -->
         <div class="panel-outer">
             <div class="panel-content left-panel">
@@ -1216,17 +1223,24 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
                                 <input type="text" class="search-input" id="search-input" placeholder="Search script...">
                             </div>
                             <div class="study-tools">
-                                <button class="tool-toggle" id="layout-flip-toggle" title="Switch between Side-by-Side and Top-Bottom Layout">⊟ Flip</button>
-                                <button class="tool-toggle" id="layout-swap-toggle" title="Swap Panel Positions">⇄ Swap</button>
+                                <button class="tool-toggle" id="focus-toggle" title="Focus Mode (Hide PDF)">👁️ Focus</button>
                                 <button class="tool-toggle" id="pdf-panel-toggle" title="Toggle PDF Panel (Side-by-Side)">📄 PDF</button>
-                                <button class="tool-toggle" id="focus-toggle" title="Cinematic Focus Mode">🎯 Focus</button>
-                                <select class="tool-toggle" id="speed-select" title="Playback Speed" style="padding: 5px 8px;">
-                                    <option value="0.75">0.75x</option>
-                                    <option value="1" selected>1.0x</option>
-                                    <option value="1.25">1.25x</option>
-                                    <option value="1.5">1.5x</option>
-                                    <option value="2">2.0x</option>
-                                </select>
+                                <button class="tool-toggle" id="layout-flip-toggle" title="Flip Layout (Vertical/Horizontal)">⊟ Flip</button>
+                                <button class="tool-toggle" id="layout-swap-toggle" title="Swap Panels (Left/Right)">⇄ Swap</button>
+                                <div class="speed-control">
+                                    <select class="tool-toggle" id="speed-select" title="Playback Speed" style="padding: 5px 8px;">
+                                        <option value="0.75">0.75x</option>
+                                        <option value="1" selected>1.0x</option>
+                                        <option value="1.25">1.25x</option>
+                                        <option value="1.5">1.5x</option>
+                                        <option value="2">2.0x</option>
+                                    </select>
+                                </div>
+                                <div class="study-tools" id="audio-controls">
+                                    <button class="tool-toggle" id="mute-btn" title="Mute/Unmute">🔊</button>
+                                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1" style="width: 60px; accent-color: var(--accent);">
+                                    <button class="tool-toggle" id="audio-diagnostic" title="Run Sound Diagnostic">🔍</button>
+                                </div>
                             </div>
                             <button class="play-btn" id="play-btn">▶ Play All</button>
                             <div class="theme-picker" id="theme-picker">
@@ -1275,6 +1289,12 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
 
                     <div id="segments-container">
                         {segments_html}
+                    </div>
+                    
+                    <!-- Sound Status Bar -->
+                    <div id="sound-status-bar" style="position: sticky; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: #44ff44; font-family: monospace; font-size: 0.7rem; padding: 4px 10px; border-top: 1px solid #444; z-index: 100; display: flex; justify-content: space-between; align-items: center;">
+                        <span id="sound-status-text">Audio Ready</span>
+                        <span id="sound-status-file" style="opacity: 0.6; font-size: 0.6rem;">No file loaded</span>
                     </div>
                 </div>
             </div>
@@ -1369,8 +1389,8 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }});
     }}
 
-    // Global logic initialization
     // Load persisted data
+    window.addEventListener('DOMContentLoaded', () => {{
         const savedNotes = localStorage.getItem(storageKey + '_notes');
         if (savedNotes) document.querySelector('#sticky-note textarea').value = savedNotes;
 
@@ -1436,126 +1456,31 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             updateScrollMarkers();
         }};
 
-    // LEED-Style Toolbar Wiring
-    const toolButtons = document.querySelectorAll('.leed-btn[data-tool]');
-    let currentTool = 'select';
-
-    toolButtons.forEach(btn => {{
-        btn.onclick = () => {{
-            toolButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentTool = btn.dataset.tool;
-            
-            // Toggle drawing canvas visibility/activity
-            const canvas = document.getElementById('drawing-canvas');
-            if (currentTool === 'draw') {{
-                canvas.classList.add('active');
-            }} else {{
-                canvas.classList.remove('active');
-            }}
-        }};
-    }});
-
-    // Layout Buttons
-    document.getElementById('leed-swap').onclick = () => document.getElementById('layout-swap-toggle').click();
-    document.getElementById('leed-flip').onclick = () => document.getElementById('layout-flip-toggle').click();
-    document.getElementById('leed-pdf').onclick = (e) => {{
-        document.getElementById('pdf-panel-toggle').click();
-        e.currentTarget.classList.toggle('active');
-    }};
-    document.getElementById('leed-focus').onclick = (e) => {{
-        document.getElementById('focus-toggle').click();
-        e.currentTarget.classList.toggle('active');
-    }};
-    document.getElementById('leed-play').onclick = () => document.getElementById('play-btn').click();
-    document.getElementById('leed-eraser').onclick = () => {{
-        if (confirm('Clear all drawings, highlights, and text annotations?')) {{
-            clearAllHighlights(); // This also reloads
-        }}
-    }};
-    document.getElementById('leed-theme').onclick = () => {{
-        const themes = ['midnight', 'ocean', 'sunset', 'forest', 'lavender', 'light'];
-        const current = document.documentElement.getAttribute('data-theme') || 'midnight';
-        const next = themes[(themes.indexOf(current) + 1) % themes.length];
-        document.querySelector(`.theme-dot[data-theme="${{next}}"]`).click();
-    }};
-
-    // New Text Annotation Logic
-    const pdfAnnoTextKey = storageKey + '_pdf_text_annos';
-    let pdfTextAnnos = JSON.parse(localStorage.getItem(pdfAnnoTextKey) || '[]');
-
-    function createTextAnno(x, y, pageNum, text = "", isNew = true) {{
-        const container = document.getElementById('pdf-page-' + pageNum);
-        if (!container) return;
-
-        const anno = document.createElement('div');
-        anno.className = 'pdf-annotation-text';
-        anno.style.left = x + 'px';
-        anno.style.top = y + 'px';
-        anno.contentEditable = true;
-        anno.innerText = text;
-
-        if (isNew) {{
-            setTimeout(() => anno.focus(), 10);
-            anno.classList.add('editing');
-        }}
-
-        anno.onblur = () => {{
-            anno.classList.remove('editing');
-            if (anno.innerText.trim() === "") {{
-                anno.remove();
-                saveTextAnnos();
-            }} else {{
-                saveTextAnnos();
-            }}
-        }};
-
-        container.appendChild(anno);
-    }}
-
-    function saveTextAnnos() {{
-        const annos = [];
-        document.querySelectorAll('.pdf-annotation-text').forEach(el => {{
-            const container = el.closest('.pdf-page-container');
-            if (!container) return;
-            annos.push({{
-                x: parseFloat(el.style.left),
-                y: parseFloat(el.style.top),
-                pageNum: container.dataset.pageNumber,
-                text: el.innerText
-            }});
-        }});
-        localStorage.setItem(pdfAnnoTextKey, JSON.stringify(annos));
-    }}
-
-    function loadTextAnnos(pageNum, container) {{
-        pdfTextAnnos.forEach(a => {{
-            if (a.pageNum == pageNum) {{
-                createTextAnno(a.x, a.y, a.pageNum, a.text, false);
-            }}
-        }});
-    }}
-
-    // Global listener for adding new text annotations
-    document.addEventListener('mousedown', (e) => {{
-        if (currentTool !== 'text') return;
-        const pageContainer = e.target.closest('.pdf-page-container');
-        if (!pageContainer) return;
+        // Layout Swap and Flip Logic
+        const swapBtn = document.getElementById('layout-swap-toggle');
+        const flipBtn = document.getElementById('layout-flip-toggle');
         
-        // Don't spawn if clicking existing anno
-        if (e.target.classList.contains('pdf-annotation-text')) return;
+        const isSwapped = localStorage.getItem(storageKey + '_layout_swapped') === 'true';
+        const isVertical = localStorage.getItem(storageKey + '_layout_vertical') === 'true';
+        
+        if (isSwapped) splitScreen.classList.add('layout-swapped');
+        if (isVertical) splitScreen.classList.add('layout-vertical');
 
-        const rect = pageContainer.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const pageNum = pageContainer.dataset.pageNumber;
+        swapBtn.onclick = () => {{
+            const swapped = splitScreen.classList.toggle('layout-swapped');
+            localStorage.setItem(storageKey + '_layout_swapped', swapped);
+            updateScrollMarkers();
+        }};
 
-        createTextAnno(x, y, pageNum, "Type here...", true);
-    }});
+        flipBtn.onclick = () => {{
+            const vertical = splitScreen.classList.toggle('layout-vertical');
+            localStorage.setItem(storageKey + '_layout_vertical', vertical);
+            updateScrollMarkers();
+        }};
 
-        console.log("Script initializing...");
+        // Draggable Resizer Logic
         const dragBar = document.getElementById('drag-bar');
-        const leftPanelOuter = document.querySelector('.panel-outer:nth-of-type(1)');
+        const leftPanelOuter = document.querySelector('.panel-outer:nth-child(1)');
         let isDragging = false;
 
         const savedWidth = localStorage.getItem(storageKey + '_left_width');
@@ -1619,12 +1544,10 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }});
 
         // PDF.js Integration Logic
-        const pdfjsLib = window['pdfjsLib'] || window['pdfjs-dist/build/pdf'];
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
         const pdfViewerContainer = document.getElementById('pdf-viewer-container');
         const rightPanel = document.querySelector('.right-panel');
-        if (pdfjsLib) {{
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }}
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let pdfDoc = null;
         let pageRendering = new Set();
@@ -1637,13 +1560,8 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
 
         async function initPDFViewer(base64Data) {{
-            console.log("PDF Engine: Starting initialization...");
-            if (!base64Data) {{
-                console.error("PDF Engine: No base64 data provided!");
-                return;
-            }}
+            console.log("Initializing Optimized PDF Viewer...");
             try {{
-                console.log("PDF Engine: Decoding base64 data (" + base64Data.length + " chars)...");
                 const binaryString = atob(base64Data);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {{
@@ -1691,10 +1609,8 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
 
         // PDF Initialization
         const pdfFallback = document.getElementById('pdf-fallback');
-        console.log("PDF Engine: Checking for data...");
         
-        if (typeof pdfData !== 'undefined' && pdfData && pdfData.length > 0) {{
-            console.log("PDF Engine: Data found, launching viewer...");
+        if (typeof pdfData !== 'undefined' && pdfData) {{
             pdfFallback.style.display = 'none';
             initPDFViewer(pdfData);
             
@@ -1769,11 +1685,8 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
 
                 renderedPages.add(pageNum);
                 
-                // Apply persisted text edits (Old correction mode)
+                // Apply persisted text edits
                 applyPersistedEdits(pageNum, container);
-                
-                // Apply new Leed-Style Text Annotations
-                loadTextAnnos(pageNum, container);
                 
                 // Re-apply edit mode if active
                 if (editMode) applyEditability();
@@ -2019,19 +1932,28 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             }}
             updateScrollMarkers();
         }}
-
+    }});
+    
     const audio = document.getElementById('audio-player');
     const playBtn = document.getElementById('play-btn');
 
     function highlightCard(id) {{
-        // Remove active class from all
-        document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+        // Reset all cards
+        document.querySelectorAll('.card').forEach(c => {{
+            c.classList.remove('active');
+            const btn = c.querySelector('.card-play-btn');
+            if (btn) btn.innerHTML = '▶';
+        }});
+
         // Add to current
         const card = document.getElementById('card-' + id);
         if (card) {{
             card.classList.add('active');
             card.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
             
+            const btn = card.querySelector('.card-play-btn');
+            if (btn) btn.innerHTML = isPlaying ? '⏸' : '▶';
+
             // Sync PDF to this card's text
             const paragraph = card.querySelector('.paragraph');
             if (paragraph) {{
@@ -2040,9 +1962,26 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
     }}
 
+    window.playSegmentById = function(id) {{
+        const targetIndex = segments.findIndex(s => s.id === id);
+        if (targetIndex !== -1) {{
+            if (currentIndex === targetIndex && isPlaying) {{
+                // Toggle pause if clicking current
+                isPlaying = false;
+                audio.pause();
+                playBtn.innerHTML = '▶ Resume';
+                highlightCard(id);
+            }} else {{
+                currentIndex = targetIndex;
+                isPlaying = true;
+                playBtn.innerHTML = '⏸ Pause';
+                playSegment(currentIndex);
+            }}
+        }}
+    }};
+
     function playSegment(index) {{
-        if (index >= segments.length) {{
-            // Finished
+        if (index < 0 || index >= segments.length) {{
             isPlaying = false;
             playBtn.innerHTML = '▶ Play All';
             document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
@@ -2058,16 +1997,58 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         document.getElementById('progress-bar').style.width = progress + '%';
 
         if (seg.audio_path) {{
-            audio.src = encodeURI(seg.audio_path);
+            // Removed cache buster as it can break local file:// access on some browsers
+            const audioSrc = seg.audio_path;
+            audio.src = audioSrc;
             audio.load();
-            if (isPlaying) {{
-                audio.play().catch(e => alert("Audio error: " + e.message));
-            }}
+            
+            updateSoundStatus("Loading...", audioSrc);
+            
+            // Ensure we wait for enough data before playing
+            audio.oncanplay = () => {{
+                if (isPlaying) {{
+                    audio.play().then(() => {{
+                        updateSoundStatus("Playing", audioSrc);
+                    }}).catch(e => {{
+                        console.error("Playback failed:", e);
+                        updateSoundStatus("BLOCKED: Click Play to unlock audio", audioSrc, true);
+                        // If blocked by browser, show resume state
+                        isPlaying = false;
+                        playBtn.innerHTML = '▶ Resume';
+                    }});
+                }}
+                audio.oncanplay = null;
+            }};
+            
+            audio.onerror = () => {{
+                console.error("Audio Load Error:", seg.audio_path);
+                updateSoundStatus("ERROR: File not found", audioSrc, true);
+                // Auto-advance if audio fails to load
+                if (isPlaying) setTimeout(() => loadNext(), 2000);
+            }};
         }} else {{
+            updateSoundStatus("No audio path for this segment", "N/A");
             // No audio? Auto-advance after 2 seconds
             if (isPlaying) {{
                 setTimeout(() => loadNext(), 2000);
             }}
+        }}
+    }}
+
+    function updateSoundStatus(msg, file = "", isError = false) {{
+        const statusText = document.getElementById('sound-status-text');
+        const statusFile = document.getElementById('sound-status-file');
+        const statusBar = document.getElementById('sound-status-bar');
+        
+        statusText.textContent = msg;
+        statusFile.textContent = file.split('/').pop();
+        
+        if (isError) {{
+            statusBar.style.color = '#ff4444';
+            statusBar.style.background = 'rgba(100, 0, 0, 0.9)';
+        }} else {{
+            statusBar.style.color = '#44ff44';
+            statusBar.style.background = 'rgba(0, 0, 0, 0.8)';
         }}
     }}
 
@@ -2079,6 +2060,61 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
     audio.onended = () => {{
         if (isPlaying) loadNext();
     }};
+
+    // Browser Audio Unlock Logic (Primes the audio engine on first click)
+    const unlockAudio = () => {{
+        const silentPlay = audio.play();
+        if (silentPlay !== undefined) {{
+            silentPlay.then(() => {{
+                audio.pause();
+                audio.currentTime = 0;
+                document.removeEventListener('click', unlockAudio);
+                updateSoundStatus("Audio System Primed");
+            }}).catch(e => {{
+                console.log("Waiting for user interaction to unlock audio...");
+            }});
+        }}
+    }};
+    document.addEventListener('click', unlockAudio);
+
+    // Audio Controls (Volume/Mute)
+    const muteBtn = document.getElementById('mute-btn');
+    const volumeSlider = document.getElementById('volume-slider');
+    
+    muteBtn.addEventListener('click', () => {{
+        audio.muted = !audio.muted;
+        muteBtn.innerHTML = audio.muted ? '🔇' : '🔊';
+        muteBtn.classList.toggle('active', audio.muted);
+    }});
+    
+    volumeSlider.addEventListener('input', (e) => {{
+        audio.volume = e.target.value;
+        if (audio.volume > 0) {{
+            audio.muted = false;
+            muteBtn.innerHTML = '🔊';
+            muteBtn.classList.remove('active');
+        }}
+    }});
+
+    const diagBtn = document.getElementById('audio-diagnostic');
+    diagBtn.addEventListener('click', () => {{
+        let report = "--- SOUND DIAGNOSTIC ---\\n";
+        report += "1. Audio Element: " + (audio ? "OK" : "MISSING") + "\\n";
+        report += "2. Current Src: " + (audio.src || "None") + "\\n";
+        report += "3. Volume: " + audio.volume + "\\n";
+        report += "4. Muted: " + audio.muted + "\\n";
+        report += "5. Network State: " + audio.networkState + "\\n";
+        report += "6. Ready State: " + audio.readyState + "\\n";
+        
+        // Test play
+        audio.play().then(() => {{
+            report += "7. Play Test: SUCCESS\\n";
+            alert(report + "\\nDiagnostic finished: Audio is working correctly.");
+        }}).catch(e => {{
+            report += "7. Play Test: FAILED (" + e.message + ")\\n";
+            alert(report + "\\nDiagnostic finished: Browser is blocking audio. Please click anywhere on the page and try again.");
+        }});
+    }});
 
     playBtn.addEventListener('click', () => {{
         if (isPlaying) {{
@@ -2180,7 +2216,52 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
                 card.style.display = 'none';
             }}
         }});
+        updateScrollMarkers();
     }});
+
+    // Layout Toggles
+    const pdfToggle = document.getElementById('pdf-panel-toggle');
+    const layoutFlip = document.getElementById('layout-flip-toggle');
+    const layoutSwap = document.getElementById('layout-swap-toggle');
+    const splitScreen = document.querySelector('.split-screen');
+
+    pdfToggle.addEventListener('click', () => {{
+        const isHidden = splitScreen.classList.toggle('pdf-hidden');
+        pdfToggle.classList.toggle('active', !isHidden);
+        localStorage.setItem(storageKey + '_pdf_hidden', isHidden);
+        // Refresh markers as layout shifted
+        setTimeout(updateScrollMarkers, 300);
+    }});
+
+    layoutFlip.addEventListener('click', () => {{
+        const isVertical = splitScreen.classList.toggle('layout-vertical');
+        layoutFlip.classList.toggle('active', isVertical);
+        localStorage.setItem(storageKey + '_layout_vertical', isVertical);
+        setTimeout(updateScrollMarkers, 300);
+    }});
+
+    layoutSwap.addEventListener('click', () => {{
+        const isSwapped = splitScreen.classList.toggle('layout-swapped');
+        layoutSwap.classList.toggle('active', isSwapped);
+        localStorage.setItem(storageKey + '_layout_swapped', isSwapped);
+        setTimeout(updateScrollMarkers, 300);
+    }});
+
+    // Initial Layout Restore
+    if (localStorage.getItem(storageKey + '_pdf_hidden') === 'true') {{
+        splitScreen.classList.add('pdf-hidden');
+        pdfToggle.classList.remove('active');
+    }} else {{
+        pdfToggle.classList.add('active');
+    }}
+    if (localStorage.getItem(storageKey + '_layout_vertical') === 'true') {{
+        splitScreen.classList.add('layout-vertical');
+        layoutFlip.classList.add('active');
+    }}
+    if (localStorage.getItem(storageKey + '_layout_swapped') === 'true') {{
+        splitScreen.classList.add('layout-swapped');
+        layoutSwap.classList.add('active');
+    }}
 
     // Highlighter Feature
     const highlightBtn = document.getElementById('highlighter-btn');
@@ -2576,17 +2657,32 @@ def main():
             char_str = item.get("character", "00")
             speaker_id = char_str.split("_")[1] if "_" in char_str else "00"
             counter = seg_id + 1
-            audio_file = os.path.join(audio_folder, f"speaker{int(speaker_id)}_audio_{counter}.mp3")
-
+            
+            # Robust Audio Path Search with fallbacks
             out_audio_rel = None
-            out_image_rel = None
-
-            if os.path.exists(audio_file):
+            audio_patterns = [
+                f"speaker{int(speaker_id)}_audio_{counter}.mp3",
+                f"speaker_{int(speaker_id)}_audio_{counter}.mp3",
+                f"speaker{speaker_id}_audio_{counter}.mp3",
+                f"speaker_{speaker_id}_audio_{counter}.mp3",
+                f"audio_{counter}.mp3",
+                f"seg_{seg_id}.mp3"
+            ]
+            
+            found_audio = None
+            for pattern in audio_patterns:
+                check_path = os.path.join(audio_folder, pattern)
+                if os.path.exists(check_path):
+                    found_audio = check_path
+                    break
+            
+            if found_audio:
                 out_audio_name = f"seg_{seg_id}.mp3"
-                shutil.copy2(audio_file, os.path.join(assets_dir, out_audio_name))
+                shutil.copy2(found_audio, os.path.join(assets_dir, out_audio_name))
                 out_audio_rel = f"assets/{out_audio_name}"
 
             image_file = item.get("image")
+            out_image_rel = None
             if image_file and os.path.exists(image_file):
                 ext = os.path.splitext(image_file)[1].lower()
                 out_image_name = f"img_{seg_id}{ext}"
@@ -2600,6 +2696,9 @@ def main():
                 "audio_path": out_audio_rel,
                 "media_path": out_image_rel
             })
+
+        audio_count = len([s for s in web_segments if s["audio_path"]])
+        print(f"  [SUCCESS] Website generated with {audio_count}/{len(web_segments)} audio segments linked.")
 
         html_content = build_html_content(raw_name, web_segments, has_pdf=has_pdf, pdf_base64=pdf_encoded_string)
         html_path = os.path.join(project_dir, "index.html")
