@@ -55,10 +55,7 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
                 <div class="card-header">
                     <span class="badge">{speaker_label}</span>
                     <span class="id-badge">#{dialogue_id}</span>
-                    <div class="card-actions">
-                        <button class="card-play-btn" onclick="playSegmentById({dialogue_id})" title="Play this segment">▶</button>
-                        <button class="anno-btn" onclick="toggleAnno({dialogue_id})" title="Annotate this segment">💬</button>
-                    </div>
+                    <button class="anno-btn" onclick="toggleAnno({dialogue_id})" title="Annotate this segment">💬</button>
                 </div>
                 <p class="paragraph">{safe_paragraph}</p>
                 <div class="anno-area" id="anno-area-{dialogue_id}">
@@ -280,20 +277,7 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
         .pulse-highlight {{
             box-shadow: 0 0 15px #fff, 0 0 25px #facc15 !important;
-            transform: scale(1.05);
-            transition: all 0.2s ease;
-        }}
-        
-        .pdf-playback-pulse {{
-            animation: pdfPulse 1.5s infinite alternate ease-in-out;
-            background: rgba(239, 68, 68, 0.4) !important;
-            border-radius: 2px;
-            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
-        }}
-        
-        @keyframes pdfPulse {{
-            from {{ opacity: 0.4; transform: scale(1.0); }}
-            to {{ opacity: 0.8; transform: scale(1.02); }}
+            transform: scale(1.1);
         }}
 
         /* Playback specific highlight */
@@ -330,30 +314,23 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             gap: 10px;
         }}
         .editable-active {{
-            outline: 2px dashed #facc15 !important;
-            background: rgba(255, 255, 255, 0.9) !important; /* High-contrast background for editing */
-            color: black !important;      
-            z-index: 1000 !important;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            outline: 1px dashed #facc15 !important;
+            background: white !important; /* Mask the original PDF text underneath */
+            color: black !important;      /* Make your new text visible */
+            z-index: 100 !important;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
             mix-blend-mode: normal !important;
-            padding: 2px;
-            border-radius: 2px;
         }}
         .editable-active:focus {{
-            outline: 3px solid #facc15 !important;
+            outline: 2px solid #facc15 !important;
             background: white !important;
             color: black !important;
-            z-index: 1001 !important;
-        }}
-        /* Ensure text layer is clickable during edit mode */
-        .split-screen:has(.editable-active) .textLayer {{
-            z-index: 5000 !important;
-            pointer-events: auto !important;
+            z-index: 101 !important;
         }}
         /* Dim the canvas slightly when editing to focus on text layer */
         .split-screen:has(.editable-active) .pdf-page-container canvas {{
-            opacity: 0.3;
-            filter: grayscale(1) blur(1px);
+            opacity: 0.4;
+            filter: grayscale(1);
         }}
         .panel-content {{
             flex: 1;
@@ -386,25 +363,18 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
             position: absolute;
             left: 0;
             width: 100%;
-            height: 4px;
+            height: 3px;
             background: #facc15;
             box-shadow: 0 0 8px rgba(250, 204, 21, 0.6);
             border-radius: 0;
             z-index: 10;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: transform 0.1s;
         }}
         .scroll-marker:hover {{
-            height: 10px;
+            transform: scaleY(2);
             background: #fff;
             z-index: 20;
-            box-shadow: 0 0 15px #fff;
-        }}
-        .scroll-marker.active {{
-            background: #ef4444;
-            box-shadow: 0 0 12px #ef4444;
-            height: 6px;
-            z-index: 15;
         }}
         
         .split-screen {{
@@ -866,37 +836,8 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         .card-header {{
             display: flex;
             align-items: center;
-            justify-content: space-between;
             gap: 0.5rem;
             margin-bottom: 0.6rem;
-        }}
-        .card-actions {{
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }}
-        .card-play-btn {{
-            background: var(--accent);
-            color: white;
-            border: none;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.2s;
-        }}
-        .card-play-btn:hover {{
-            transform: scale(1.1);
-            background: var(--accent-hover);
-        }}
-        .card.active .card-play-btn {{
-            background: white;
-            color: var(--accent);
-            box-shadow: 0 0 10px rgba(255,255,255,0.5);
         }}
 
         .badge {{
@@ -1223,24 +1164,17 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
                                 <input type="text" class="search-input" id="search-input" placeholder="Search script...">
                             </div>
                             <div class="study-tools">
-                                <button class="tool-toggle" id="focus-toggle" title="Focus Mode (Hide PDF)">👁️ Focus</button>
+                                <button class="tool-toggle" id="layout-flip-toggle" title="Switch between Side-by-Side and Top-Bottom Layout">⊟ Flip</button>
+                                <button class="tool-toggle" id="layout-swap-toggle" title="Swap Panel Positions">⇄ Swap</button>
                                 <button class="tool-toggle" id="pdf-panel-toggle" title="Toggle PDF Panel (Side-by-Side)">📄 PDF</button>
-                                <button class="tool-toggle" id="layout-flip-toggle" title="Flip Layout (Vertical/Horizontal)">⊟ Flip</button>
-                                <button class="tool-toggle" id="layout-swap-toggle" title="Swap Panels (Left/Right)">⇄ Swap</button>
-                                <div class="speed-control">
-                                    <select class="tool-toggle" id="speed-select" title="Playback Speed" style="padding: 5px 8px;">
-                                        <option value="0.75">0.75x</option>
-                                        <option value="1" selected>1.0x</option>
-                                        <option value="1.25">1.25x</option>
-                                        <option value="1.5">1.5x</option>
-                                        <option value="2">2.0x</option>
-                                    </select>
-                                </div>
-                                <div class="study-tools" id="audio-controls">
-                                    <button class="tool-toggle" id="mute-btn" title="Mute/Unmute">🔊</button>
-                                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1" style="width: 60px; accent-color: var(--accent);">
-                                    <button class="tool-toggle" id="audio-diagnostic" title="Run Sound Diagnostic">🔍</button>
-                                </div>
+                                <button class="tool-toggle" id="focus-toggle" title="Cinematic Focus Mode">🎯 Focus</button>
+                                <select class="tool-toggle" id="speed-select" title="Playback Speed" style="padding: 5px 8px;">
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1" selected>1.0x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2">2.0x</option>
+                                </select>
                             </div>
                             <button class="play-btn" id="play-btn">▶ Play All</button>
                             <div class="theme-picker" id="theme-picker">
@@ -1289,12 +1223,6 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
 
                     <div id="segments-container">
                         {segments_html}
-                    </div>
-                    
-                    <!-- Sound Status Bar -->
-                    <div id="sound-status-bar" style="position: sticky; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: #44ff44; font-family: monospace; font-size: 0.7rem; padding: 4px 10px; border-top: 1px solid #444; z-index: 100; display: flex; justify-content: space-between; align-items: center;">
-                        <span id="sound-status-text">Audio Ready</span>
-                        <span id="sound-status-file" style="opacity: 0.6; font-size: 0.6rem;">No file loaded</span>
                     </div>
                 </div>
             </div>
@@ -1938,22 +1866,14 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
     const playBtn = document.getElementById('play-btn');
 
     function highlightCard(id) {{
-        // Reset all cards
-        document.querySelectorAll('.card').forEach(c => {{
-            c.classList.remove('active');
-            const btn = c.querySelector('.card-play-btn');
-            if (btn) btn.innerHTML = '▶';
-        }});
-
+        // Remove active class from all
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
         // Add to current
         const card = document.getElementById('card-' + id);
         if (card) {{
             card.classList.add('active');
             card.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
             
-            const btn = card.querySelector('.card-play-btn');
-            if (btn) btn.innerHTML = isPlaying ? '⏸' : '▶';
-
             // Sync PDF to this card's text
             const paragraph = card.querySelector('.paragraph');
             if (paragraph) {{
@@ -1962,26 +1882,9 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         }}
     }}
 
-    window.playSegmentById = function(id) {{
-        const targetIndex = segments.findIndex(s => s.id === id);
-        if (targetIndex !== -1) {{
-            if (currentIndex === targetIndex && isPlaying) {{
-                // Toggle pause if clicking current
-                isPlaying = false;
-                audio.pause();
-                playBtn.innerHTML = '▶ Resume';
-                highlightCard(id);
-            }} else {{
-                currentIndex = targetIndex;
-                isPlaying = true;
-                playBtn.innerHTML = '⏸ Pause';
-                playSegment(currentIndex);
-            }}
-        }}
-    }};
-
     function playSegment(index) {{
-        if (index < 0 || index >= segments.length) {{
+        if (index >= segments.length) {{
+            // Finished
             isPlaying = false;
             playBtn.innerHTML = '▶ Play All';
             document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
@@ -1997,58 +1900,16 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
         document.getElementById('progress-bar').style.width = progress + '%';
 
         if (seg.audio_path) {{
-            // Removed cache buster as it can break local file:// access on some browsers
-            const audioSrc = seg.audio_path;
-            audio.src = audioSrc;
+            audio.src = encodeURI(seg.audio_path);
             audio.load();
-            
-            updateSoundStatus("Loading...", audioSrc);
-            
-            // Ensure we wait for enough data before playing
-            audio.oncanplay = () => {{
-                if (isPlaying) {{
-                    audio.play().then(() => {{
-                        updateSoundStatus("Playing", audioSrc);
-                    }}).catch(e => {{
-                        console.error("Playback failed:", e);
-                        updateSoundStatus("BLOCKED: Click Play to unlock audio", audioSrc, true);
-                        // If blocked by browser, show resume state
-                        isPlaying = false;
-                        playBtn.innerHTML = '▶ Resume';
-                    }});
-                }}
-                audio.oncanplay = null;
-            }};
-            
-            audio.onerror = () => {{
-                console.error("Audio Load Error:", seg.audio_path);
-                updateSoundStatus("ERROR: File not found", audioSrc, true);
-                // Auto-advance if audio fails to load
-                if (isPlaying) setTimeout(() => loadNext(), 2000);
-            }};
+            if (isPlaying) {{
+                audio.play().catch(e => alert("Audio error: " + e.message));
+            }}
         }} else {{
-            updateSoundStatus("No audio path for this segment", "N/A");
             // No audio? Auto-advance after 2 seconds
             if (isPlaying) {{
                 setTimeout(() => loadNext(), 2000);
             }}
-        }}
-    }}
-
-    function updateSoundStatus(msg, file = "", isError = false) {{
-        const statusText = document.getElementById('sound-status-text');
-        const statusFile = document.getElementById('sound-status-file');
-        const statusBar = document.getElementById('sound-status-bar');
-        
-        statusText.textContent = msg;
-        statusFile.textContent = file.split('/').pop();
-        
-        if (isError) {{
-            statusBar.style.color = '#ff4444';
-            statusBar.style.background = 'rgba(100, 0, 0, 0.9)';
-        }} else {{
-            statusBar.style.color = '#44ff44';
-            statusBar.style.background = 'rgba(0, 0, 0, 0.8)';
         }}
     }}
 
@@ -2060,61 +1921,6 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
     audio.onended = () => {{
         if (isPlaying) loadNext();
     }};
-
-    // Browser Audio Unlock Logic (Primes the audio engine on first click)
-    const unlockAudio = () => {{
-        const silentPlay = audio.play();
-        if (silentPlay !== undefined) {{
-            silentPlay.then(() => {{
-                audio.pause();
-                audio.currentTime = 0;
-                document.removeEventListener('click', unlockAudio);
-                updateSoundStatus("Audio System Primed");
-            }}).catch(e => {{
-                console.log("Waiting for user interaction to unlock audio...");
-            }});
-        }}
-    }};
-    document.addEventListener('click', unlockAudio);
-
-    // Audio Controls (Volume/Mute)
-    const muteBtn = document.getElementById('mute-btn');
-    const volumeSlider = document.getElementById('volume-slider');
-    
-    muteBtn.addEventListener('click', () => {{
-        audio.muted = !audio.muted;
-        muteBtn.innerHTML = audio.muted ? '🔇' : '🔊';
-        muteBtn.classList.toggle('active', audio.muted);
-    }});
-    
-    volumeSlider.addEventListener('input', (e) => {{
-        audio.volume = e.target.value;
-        if (audio.volume > 0) {{
-            audio.muted = false;
-            muteBtn.innerHTML = '🔊';
-            muteBtn.classList.remove('active');
-        }}
-    }});
-
-    const diagBtn = document.getElementById('audio-diagnostic');
-    diagBtn.addEventListener('click', () => {{
-        let report = "--- SOUND DIAGNOSTIC ---\\n";
-        report += "1. Audio Element: " + (audio ? "OK" : "MISSING") + "\\n";
-        report += "2. Current Src: " + (audio.src || "None") + "\\n";
-        report += "3. Volume: " + audio.volume + "\\n";
-        report += "4. Muted: " + audio.muted + "\\n";
-        report += "5. Network State: " + audio.networkState + "\\n";
-        report += "6. Ready State: " + audio.readyState + "\\n";
-        
-        // Test play
-        audio.play().then(() => {{
-            report += "7. Play Test: SUCCESS\\n";
-            alert(report + "\\nDiagnostic finished: Audio is working correctly.");
-        }}).catch(e => {{
-            report += "7. Play Test: FAILED (" + e.message + ")\\n";
-            alert(report + "\\nDiagnostic finished: Browser is blocking audio. Please click anywhere on the page and try again.");
-        }});
-    }});
 
     playBtn.addEventListener('click', () => {{
         if (isPlaying) {{
@@ -2216,52 +2022,7 @@ def build_html_content(title, segments, has_pdf=False, pdf_base64=None):
                 card.style.display = 'none';
             }}
         }});
-        updateScrollMarkers();
     }});
-
-    // Layout Toggles
-    const pdfToggle = document.getElementById('pdf-panel-toggle');
-    const layoutFlip = document.getElementById('layout-flip-toggle');
-    const layoutSwap = document.getElementById('layout-swap-toggle');
-    const splitScreen = document.querySelector('.split-screen');
-
-    pdfToggle.addEventListener('click', () => {{
-        const isHidden = splitScreen.classList.toggle('pdf-hidden');
-        pdfToggle.classList.toggle('active', !isHidden);
-        localStorage.setItem(storageKey + '_pdf_hidden', isHidden);
-        // Refresh markers as layout shifted
-        setTimeout(updateScrollMarkers, 300);
-    }});
-
-    layoutFlip.addEventListener('click', () => {{
-        const isVertical = splitScreen.classList.toggle('layout-vertical');
-        layoutFlip.classList.toggle('active', isVertical);
-        localStorage.setItem(storageKey + '_layout_vertical', isVertical);
-        setTimeout(updateScrollMarkers, 300);
-    }});
-
-    layoutSwap.addEventListener('click', () => {{
-        const isSwapped = splitScreen.classList.toggle('layout-swapped');
-        layoutSwap.classList.toggle('active', isSwapped);
-        localStorage.setItem(storageKey + '_layout_swapped', isSwapped);
-        setTimeout(updateScrollMarkers, 300);
-    }});
-
-    // Initial Layout Restore
-    if (localStorage.getItem(storageKey + '_pdf_hidden') === 'true') {{
-        splitScreen.classList.add('pdf-hidden');
-        pdfToggle.classList.remove('active');
-    }} else {{
-        pdfToggle.classList.add('active');
-    }}
-    if (localStorage.getItem(storageKey + '_layout_vertical') === 'true') {{
-        splitScreen.classList.add('layout-vertical');
-        layoutFlip.classList.add('active');
-    }}
-    if (localStorage.getItem(storageKey + '_layout_swapped') === 'true') {{
-        splitScreen.classList.add('layout-swapped');
-        layoutSwap.classList.add('active');
-    }}
 
     // Highlighter Feature
     const highlightBtn = document.getElementById('highlighter-btn');
@@ -2657,32 +2418,17 @@ def main():
             char_str = item.get("character", "00")
             speaker_id = char_str.split("_")[1] if "_" in char_str else "00"
             counter = seg_id + 1
-            
-            # Robust Audio Path Search with fallbacks
+            audio_file = os.path.join(audio_folder, f"speaker{int(speaker_id)}_audio_{counter}.mp3")
+
             out_audio_rel = None
-            audio_patterns = [
-                f"speaker{int(speaker_id)}_audio_{counter}.mp3",
-                f"speaker_{int(speaker_id)}_audio_{counter}.mp3",
-                f"speaker{speaker_id}_audio_{counter}.mp3",
-                f"speaker_{speaker_id}_audio_{counter}.mp3",
-                f"audio_{counter}.mp3",
-                f"seg_{seg_id}.mp3"
-            ]
-            
-            found_audio = None
-            for pattern in audio_patterns:
-                check_path = os.path.join(audio_folder, pattern)
-                if os.path.exists(check_path):
-                    found_audio = check_path
-                    break
-            
-            if found_audio:
+            out_image_rel = None
+
+            if os.path.exists(audio_file):
                 out_audio_name = f"seg_{seg_id}.mp3"
-                shutil.copy2(found_audio, os.path.join(assets_dir, out_audio_name))
+                shutil.copy2(audio_file, os.path.join(assets_dir, out_audio_name))
                 out_audio_rel = f"assets/{out_audio_name}"
 
             image_file = item.get("image")
-            out_image_rel = None
             if image_file and os.path.exists(image_file):
                 ext = os.path.splitext(image_file)[1].lower()
                 out_image_name = f"img_{seg_id}{ext}"
@@ -2696,9 +2442,6 @@ def main():
                 "audio_path": out_audio_rel,
                 "media_path": out_image_rel
             })
-
-        audio_count = len([s for s in web_segments if s["audio_path"]])
-        print(f"  [SUCCESS] Website generated with {audio_count}/{len(web_segments)} audio segments linked.")
 
         html_content = build_html_content(raw_name, web_segments, has_pdf=has_pdf, pdf_base64=pdf_encoded_string)
         html_path = os.path.join(project_dir, "index.html")

@@ -11,6 +11,10 @@ import time
 import socket
 import argparse
 from playwright.sync_api import sync_playwright
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Prevent any socket operation from hanging forever
 socket.setdefaulttimeout(10.0)
@@ -47,8 +51,8 @@ class TripleTierProvider(ImageSearchProvider):
         self.download_dir = "downloaded_images"
         os.makedirs(self.download_dir, exist_ok=True)
         self.searxng_base = os.getenv("SEARXNG_BASE_URL", "http://localhost:8888")
-        self.klipy_api_key = os.getenv("KLIPY_API_KEY", "t4CHqwPHXfNhRyoedR8YL9Rnf0omI8KU2C6pjW1Cv31MqB3aWoOgpCff8YEzA1Zh")
-        self.giphy_api_key = os.getenv("GIPHY_API_KEY", "HjAQuQCRRgZPCZStMtwwDK3EytDhy5vV")
+        self.klipy_api_key = os.getenv("KLIPY_API_KEY")
+        self.giphy_api_key = os.getenv("GIPHY_API_KEY")
         
         # Default order if none provided: 1 (Degoog), 2 (Wikimedia), 3 (SearXNG), 4 (Klipy), 5 (Giphy)
         self.tier_order = tier_order or [1, 2, 3, 4, 5]
@@ -312,8 +316,12 @@ class TripleTierProvider(ImageSearchProvider):
 
 
     def _search_unsplash(self, term: str, dialogue_id=None) -> Optional[str]:
+        client_id = os.getenv("UNSPLASH_ACCESS_KEY")
+        if not client_id:
+            print("[Unsplash] Skipped: UNSPLASH_ACCESS_KEY not set.")
+            return None
         try:
-            url = f"https://api.unsplash.com/search/photos?query={urllib.parse.quote(term)}&per_page=1&client_id=rGy28dBeqAc9szkRLHet6kwVQ9-z1UrsEXGG_IfImT0"
+            url = f"https://api.unsplash.com/search/photos?query={urllib.parse.quote(term)}&per_page=1&client_id={client_id}"
             req = urllib.request.Request(url, headers={"User-Agent": random.choice(self.user_agents)})
             with urllib.request.urlopen(req, timeout=8) as response:
                 data = json.loads(response.read().decode("utf-8"))
@@ -329,7 +337,11 @@ class TripleTierProvider(ImageSearchProvider):
     def _search_pexels(self, term: str, dialogue_id=None) -> Optional[str]:
         try:
             url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(term)}&per_page=1"
-            req = urllib.request.Request(url, headers={"Authorization": "bBikoIhqeNoqIllcmDZmwrpRBqP4BsxFXfUX5u70RA4PpqAKTAsIFtWB", "User-Agent": random.choice(self.user_agents)})
+            api_key = os.getenv("PEXELS_API_KEY")
+            if not api_key:
+                print("[Pexels] Skipped: PEXELS_API_KEY not set.")
+                return None
+            req = urllib.request.Request(url, headers={"Authorization": api_key, "User-Agent": random.choice(self.user_agents)})
             with urllib.request.urlopen(req, timeout=8) as response:
                 data = json.loads(response.read().decode("utf-8"))
             for r in data.get("photos", []):
@@ -342,8 +354,12 @@ class TripleTierProvider(ImageSearchProvider):
         return None
 
     def _search_pixabay(self, term: str, dialogue_id=None) -> Optional[str]:
+        api_key = os.getenv("PIXABAY_API_KEY")
+        if not api_key:
+            print("[Pixabay] Skipped: PIXABAY_API_KEY not set.")
+            return None
         try:
-            url = f"https://pixabay.com/api/?key=54448226-5c5a24e493b6a64dfe6f3c560&q={urllib.parse.quote(term)}&per_page=3"
+            url = f"https://pixabay.com/api/?key={api_key}&q={urllib.parse.quote(term)}&per_page=3"
             req = urllib.request.Request(url, headers={"User-Agent": random.choice(self.user_agents)})
             with urllib.request.urlopen(req, timeout=8) as response:
                 data = json.loads(response.read().decode("utf-8"))
@@ -357,9 +373,13 @@ class TripleTierProvider(ImageSearchProvider):
         return None
 
     def _search_pexels_video(self, term: str, dialogue_id=None) -> Optional[str]:
+        api_key = os.getenv("PEXELS_API_KEY")
+        if not api_key:
+            print("[Pexels Video] Skipped: PEXELS_API_KEY not set.")
+            return None
         try:
             url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(term)}&per_page=1"
-            req = urllib.request.Request(url, headers={"Authorization": "bBikoIhqeNoqIllcmDZmwrpRBqP4BsxFXfUX5u70RA4PpqAKTAsIFtWB", "User-Agent": random.choice(self.user_agents)})
+            req = urllib.request.Request(url, headers={"Authorization": api_key, "User-Agent": random.choice(self.user_agents)})
             with urllib.request.urlopen(req, timeout=8) as response:
                 data = json.loads(response.read().decode("utf-8"))
             for r in data.get("videos", []):
@@ -377,8 +397,12 @@ class TripleTierProvider(ImageSearchProvider):
         return None
 
     def _search_pixabay_video(self, term: str, dialogue_id=None) -> Optional[str]:
+        api_key = os.getenv("PIXABAY_API_KEY")
+        if not api_key:
+            print("[Pixabay Video] Skipped: PIXABAY_API_KEY not set.")
+            return None
         try:
-            url = f"https://pixabay.com/api/videos/?key=54448226-5c5a24e493b6a64dfe6f3c560&q={urllib.parse.quote(term)}&per_page=3"
+            url = f"https://pixabay.com/api/videos/?key={api_key}&q={urllib.parse.quote(term)}&per_page=3"
             req = urllib.request.Request(url, headers={"User-Agent": random.choice(self.user_agents)})
             with urllib.request.urlopen(req, timeout=8) as response:
                 data = json.loads(response.read().decode("utf-8"))
@@ -433,9 +457,12 @@ class TripleTierProvider(ImageSearchProvider):
         return None
 
     def _search_openverse(self, term: str, dialogue_id=None) -> Optional[str]:
+        client_id = os.getenv("OPENVERSE_CLIENT_ID")
+        client_secret = os.getenv("OPENVERSE_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            print("[Openverse] Skipped: OPENVERSE credentials not set.")
+            return None
         try:
-            client_id = "V0fh5TbZs7kKW7xe3tly9mnUivv4Dr6WzjHZ8iOz"
-            client_secret = "XtJLQAV9mogv8xIcWqWGzOEoS5nDVEraiSunjcYNh1n8wgDwZsslta2UdUqFYsbNLZpgPrmttFCoxrHAY70dXagnmzhXpemxjNJlXJKZ0h9Zq5XLL4zeyYV1nw0kHjbL"
             data = urllib.parse.urlencode({'client_id': client_id, 'client_secret': client_secret, 'grant_type': 'client_credentials'}).encode()
             r_auth = urllib.request.Request("https://api.openverse.org/v1/auth_tokens/token/", data=data, method="POST", headers={"User-Agent": random.choice(self.user_agents), "Content-Type": "application/x-www-form-urlencoded"})
             with urllib.request.urlopen(r_auth, timeout=8) as r:
